@@ -1,0 +1,9 @@
+module CWhisper {
+    header "shim.h"
+    link "whisper"
+    link "parakeet"
+    link "ggml-base"
+    link "ggml"
+    link "llama"
+    export *
+}

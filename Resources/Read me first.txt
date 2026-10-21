@@ -1,0 +1,22 @@
+LocalFlow — voice typing that stays on your Mac
+================================================
+
+Needs: a Mac with an Apple chip (M1 or newer), macOS 14 or newer, internet once (for a 669 MB speech model).
+
+INSTALL
+1. Drag LocalFlow.app into your Applications folder and double-click it.
+2. A setup window appears. It downloads the speech model (one time) and asks for two permissions:
+   - Microphone: click Allow.
+   - Accessibility: click "Open System Settings", turn on LocalFlow in the list, come back.
+3. When the window says "All set", hold the fn key, talk, and let go. The text appears where your cursor is.
+
+TIPS
+- Double-tap fn for hands-free mode (keeps listening); tap once to finish.
+- Say "new line" or "new paragraph" to insert breaks.
+- The waveform icon in the menu bar has all settings, your recent dictations, and a personal dictionary for names it gets wrong.
+- Optional: "Enable polish wording" in the menu downloads a small local language model (1.1 GB) that fixes
+  grammar and removes stumbles before typing. Still fully offline. Untick it any time to get your exact words.
+- English and Greek are detected automatically. For Telugu or Hindi, switch to the Whisper engine in the menu.
+- Your recent dictations are kept in the menu so you can copy them again; "Clear history" in that submenu
+  deletes them. The app's log never contains what you said unless you turn that on for troubleshooting.
+- Nothing you say ever leaves the Mac. Turn Wi-Fi off and it keeps working.
