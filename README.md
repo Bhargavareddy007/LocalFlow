@@ -2,6 +2,8 @@
 
 Voice typing for macOS that never leaves your Mac. Hold a key, talk, let go: the words appear wherever your cursor is. An offline alternative to Wispr Flow.
 
+<p align="center"><img src="docs/pill.png" width="760" alt="The LocalFlow pill at the bottom of the screen, showing a live waveform while you speak"></p>
+
 - **Private.** Audio goes from the microphone to a speech model running on your Mac's GPU. No account, no cloud, no network calls. Turn Wi-Fi off and it keeps working.
 - **Fast.** The default engine transcribes 8 seconds of speech in under 100 ms on an M-series Mac.
 - **Works everywhere.** Any app with a text cursor: Mail, Slack, browsers, editors, terminals.
@@ -17,11 +19,15 @@ Requirements: a Mac with an Apple chip (M1 or newer), macOS 14 or newer, interne
 
 ## Features
 
+<img src="docs/menu.png" width="400" align="right" alt="The LocalFlow menu: dictation key, engine, language, polish wording, filler-word removal, smart spacing, hands-free mode, sounds, recent dictations, setup and permissions">
+
 - Hold fn to dictate; double-tap fn for hands-free mode, tap once to finish. Other keys selectable in the menu.
 - Two local engines. **Parakeet** is the default: very fast, and it handles English and 24 European languages (Greek, German, French, Spanish, and more) without you picking one. **Whisper large-v3-turbo** covers about 100 languages for everything Parakeet doesn't, including Chinese, Hindi, Arabic, Japanese, Korean and Turkish.
 - Optional **polish wording**: a small local language model (1.1 GB download) that fixes grammar and removes stumbles before typing. Off until you enable it in the menu.
 - Filler-word removal, "new line" / "new paragraph" commands, a personal dictionary for names it mishears, smart spacing, clipboard preserved.
 - Floating waveform while you speak, menu bar icon, recent dictations in the menu (click to copy), launch at login.
+
+<br clear="right">
 
 ## Privacy
 

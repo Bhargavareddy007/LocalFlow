@@ -61,8 +61,10 @@ final class PillView: NSView {
     override var isFlipped: Bool { false }
 
     func push(level: Float) {
-        // Map RMS (~0.005 quiet … 0.2 loud) onto 0…1 with a soft curve.
-        let v = min(1, max(0.06, CGFloat(level) * 9))
+        // Map RMS onto 0…1 on a log scale, so normal speech (~0.01–0.05) fills most of the bar height
+        // and only room noise (~0.001) stays near the floor.
+        let db = 20 * log10(max(CGFloat(level), 1e-5))      // -100 … 0
+        let v = min(1, max(0.06, (db + 60) / 50))             // -60 dB → 0, -10 dB → 1
         bars.removeFirst()
         bars.append(v)
     }
