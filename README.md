@@ -1,8 +1,13 @@
 # LocalFlow
 
+[![Download](https://img.shields.io/github/v/release/Bhargavareddy007/LocalFlow?label=Download&color=2ea44f)](https://github.com/Bhargavareddy007/LocalFlow/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/Bhargavareddy007/LocalFlow/total?label=downloads)](https://github.com/Bhargavareddy007/LocalFlow/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![macOS 14+ · Apple silicon](https://img.shields.io/badge/macOS%2014%2B-Apple%20silicon-lightgrey)
+
 Voice typing for macOS that never leaves your Mac. Hold a key, talk, let go: the words appear wherever your cursor is. An offline alternative to Wispr Flow.
 
-<p align="center"><img src="docs/pill.png" width="760" alt="The LocalFlow pill at the bottom of the screen, showing a live waveform while you speak"></p>
+<p align="center"><img src="docs/demo.gif" width="760" alt="Holding fn, speaking a sentence while the pill shows a live waveform, releasing, and the sentence appearing in a TextEdit document"></p>
 
 - **Private.** Audio goes from the microphone to a speech model running on your Mac's GPU. No account, no cloud, no network calls. Turn Wi-Fi off and it keeps working.
 - **Fast.** The default engine transcribes 8 seconds of speech in under 100 ms on an M-series Mac.

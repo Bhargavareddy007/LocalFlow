@@ -568,7 +568,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 self.state = .idle
                 self.overlay.hide()
                 self.updateIcon()
-                let detail = verbose ? ": \(text)" : " (\(text.count) chars)"
+                let detail = verbose ? ": \(text) [raw: \(raw)]" : " (\(text.count) chars)"
                 Log.info("transcribed \(String(format: "%.1f", seconds))s with \(engine.kind.rawValue) in \(ms) ms\(polishNote)\(detail)")
                 if text.isEmpty {
                     self.flash("Didn't catch that", seconds: 1.2)
