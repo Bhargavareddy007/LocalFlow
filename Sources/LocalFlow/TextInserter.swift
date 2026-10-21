@@ -1,6 +1,41 @@
 import AppKit
 import ApplicationServices
 
+/// Where the keyboard focus was when a recording started: the app, its focused window and the
+/// focused text element. Compared again right before pasting.
+struct FocusSnapshot {
+    let pid: pid_t
+    let window: AXUIElement?
+    let element: AXUIElement?
+
+    static func capture() -> FocusSnapshot {
+        let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0
+        let system = AXUIElementCreateSystemWide()
+        var focusedRef: CFTypeRef?
+        var element: AXUIElement? = nil
+        var window: AXUIElement? = nil
+        if AXUIElementCopyAttributeValue(system, kAXFocusedUIElementAttribute as CFString, &focusedRef) == .success,
+           let ref = focusedRef {
+            element = (ref as! AXUIElement)
+            var windowRef: CFTypeRef?
+            if AXUIElementCopyAttributeValue(element!, kAXWindowAttribute as CFString, &windowRef) == .success,
+               let w = windowRef {
+                window = (w as! AXUIElement)
+            }
+        }
+        return FocusSnapshot(pid: pid, window: window, element: element)
+    }
+
+    /// True when it is safe to paste: same app, and, where macOS tells us, the same window and field.
+    /// If the app cannot report its focus, the app check alone decides (as before).
+    func stillCurrent(_ now: FocusSnapshot) -> Bool {
+        guard pid == now.pid else { return false }
+        if let a = window, let b = now.window, !CFEqual(a, b) { return false }
+        if let a = element, let b = now.element, !CFEqual(a, b) { return false }
+        return true
+    }
+}
+
 /// Puts text into whatever app has keyboard focus: pasteboard + synthetic ⌘V,
 /// then restores the previous pasteboard contents.
 enum TextInserter {

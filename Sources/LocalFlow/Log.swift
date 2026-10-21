@@ -16,6 +16,10 @@ enum Log {
         if size > 1_000_000 { try? FileManager.default.removeItem(at: url) }
     }
 
+    static func clear() {
+        queue.sync { try? FileManager.default.removeItem(at: url) }
+    }
+
     static func info(_ message: String) {
         let line = "\(fmt.string(from: Date())) \(message)\n"
         fputs(line, stderr)

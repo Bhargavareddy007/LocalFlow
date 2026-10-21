@@ -16,7 +16,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var engine: SpeechEngine?
     private var engineReady = false
     private var engineLoading = false
-    private var targetApp: NSRunningApplication?
+    private var target: FocusSnapshot?
+    /// Owned by workQueue like `engine`; UI reads `polisherReady`.
+    private var polisherReady = false
     private var state: State = .idle
     private var pressTime: Date?
     private var locked = false
@@ -38,6 +40,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Log.rotateIfNeeded()
+        if !UserDefaults.standard.bool(forKey: "logPurged1") {
+            // Versions before 0.1.1 wrote dictated text into the log; remove any such log once.
+            Log.clear()
+            UserDefaults.standard.set(true, forKey: "logPurged1")
+        }
         Log.info("LocalFlow starting (pid \(ProcessInfo.processInfo.processIdentifier))")
         PersonalDictionary.ensureFileExists()
         PersonalDictionary.reload()
@@ -132,7 +139,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func togglePolish() {
         Settings.shared.polishEnabled.toggle()
-        if Settings.shared.polishEnabled, polisher == nil { loadPolisher() }
+        if Settings.shared.polishEnabled, !polisherReady { loadPolisher() }
     }
 
     private func loadPolisher() {
@@ -143,7 +150,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let p = PolisherLoader.load()
             _ = p?.polish("this is a short warm up sentence for the model")
             self.polisher = p
-            DispatchQueue.main.async { self.polishLoading = false }
+            DispatchQueue.main.async {
+                self.polisherReady = p != nil
+                self.polishLoading = false
+            }
         }
     }
 
@@ -355,7 +365,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         NSPasteboard.general.setString(text, forType: .string)
     }
 
-    @objc private func clearHistory() { History.shared.clear() }
+    @objc private func clearHistory() {
+        History.shared.clear()
+        Log.clear()
+    }
 
     @objc private func openDictionary() {
         PersonalDictionary.ensureFileExists()
@@ -427,7 +440,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 if loaded == nil {
                     self.flash("No \(kind.rawValue) model found in models folder", seconds: 3)
                 }
-                if self.polisher == nil { self.loadPolisher() }
+                if !self.polisherReady { self.loadPolisher() }
             }
         }
     }
@@ -492,7 +505,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         state = .recording
         locked = false
-        targetApp = NSWorkspace.shared.frontmostApplication
+        target = FocusSnapshot.capture()
         updateIcon()
         overlay.show(engineLoading ? .loading : .recording, message: "Loading model")
         // Safety cap for every mode: a missed key release can never leave the mic open indefinitely.
@@ -537,7 +550,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let smartSpacing = Settings.shared.smartSpacing
         let usePolish = Settings.shared.polishEnabled
         let verbose = Settings.shared.verboseLog
-        let target = targetApp
+        let target = self.target
 
         workQueue.async { [weak self] in
             guard let self = self else { return }
@@ -574,11 +587,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     self.flash("Didn't catch that", seconds: 1.2)
                     return
                 }
-                // Paste only into the app the user was in when they started talking.
-                let front = NSWorkspace.shared.frontmostApplication
-                if let target = target, let front = front, target.processIdentifier != front.processIdentifier {
+                // Paste only into the app, window and field the user was in when they started talking.
+                if let target = target, !target.stillCurrent(FocusSnapshot.capture()) {
                     TextInserter.copyOnly(text)
-                    self.flash("Copied — you switched apps. Press ⌘V where you want it.", seconds: 3)
+                    self.flash("Copied — focus moved. Press ⌘V where you want it.", seconds: 3)
                 } else {
                     TextInserter.insert(text, smartSpacing: smartSpacing)
                 }
