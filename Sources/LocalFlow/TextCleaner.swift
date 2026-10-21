@@ -55,7 +55,7 @@ enum TextCleaner {
 }
 
 /// `~/Library/Application Support/LocalFlow/dictionary.json`
-/// {"replacements": {"wisper": "Wispr", "fyes": "FYES"}}
+/// {"replacements": {"wisper": "Wispr", "jay son": "JSON"}}
 enum PersonalDictionary {
     private static var cache: [(NSRegularExpression, String)] = []
     private static var loadedAt: Date?
