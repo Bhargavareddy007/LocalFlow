@@ -8,7 +8,7 @@ final class AudioRecorder {
     var onLevel: ((Float) -> Void)?
     private(set) var isRecording = false
 
-    private let engine = AVAudioEngine()
+    private var engine: AVAudioEngine?
     private var converter: AVAudioConverter?
     private var samples: [Float] = []
     private let lock = NSLock()
@@ -19,27 +19,36 @@ final class AudioRecorder {
         if isRecording { return }
         lock.lock(); samples.removeAll(keepingCapacity: true); lock.unlock()
 
+        // A fresh engine per recording binds to the current default input. A long-lived engine keeps
+        // the old device's format after an input switch (e.g. AirPods connecting), and installTap
+        // then raises an Objective-C exception that Swift cannot catch, crashing the app.
+        let engine = AVAudioEngine()
         let input = engine.inputNode
         let inFormat = input.outputFormat(forBus: 0)
         guard inFormat.sampleRate > 0, inFormat.channelCount > 0 else {
             throw NSError(domain: "LocalFlow", code: 1,
                           userInfo: [NSLocalizedDescriptionKey: "No audio input device"])
         }
+        guard inFormat.sampleRate == input.inputFormat(forBus: 0).sampleRate else {
+            throw NSError(domain: "LocalFlow", code: 2,
+                          userInfo: [NSLocalizedDescriptionKey: "Input device is changing, try again"])
+        }
         converter = AVAudioConverter(from: inFormat, to: targetFormat)
-        input.removeTap(onBus: 0)
         input.installTap(onBus: 0, bufferSize: 1024, format: inFormat) { [weak self] buffer, _ in
             self?.process(buffer)
         }
         engine.prepare()
         try engine.start()
+        self.engine = engine
         isRecording = true
     }
 
     /// Stops capture and returns everything recorded since `start()`.
     func stop() -> [Float] {
         guard isRecording else { return [] }
-        engine.inputNode.removeTap(onBus: 0)
-        engine.stop()
+        engine?.inputNode.removeTap(onBus: 0)
+        engine?.stop()
+        engine = nil
         isRecording = false
         lock.lock(); let out = samples; samples = []; lock.unlock()
         return out
