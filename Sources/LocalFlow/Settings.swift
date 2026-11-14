@@ -77,6 +77,7 @@ final class Settings {
         return url
     }()
     static let dictionaryURL = supportDir.appendingPathComponent("dictionary.json")
+    /// Only used to delete the history file older versions kept (see History.deleteLegacyFile).
     static let historyURL = supportDir.appendingPathComponent("history.json")
 
     var hotkey: Hotkey {
@@ -122,10 +123,6 @@ final class Settings {
     /// Left off because any local process could use it to turn the mic on.
     /// Turn on with: defaults write com.bhargava.localflow signalToggle -bool true
     var signalToggle: Bool { d.bool(forKey: "signalToggle") }
-    var keepHistory: Bool {
-        get { d.object(forKey: "keepHistory") as? Bool ?? true }
-        set { d.set(newValue, forKey: "keepHistory") }
-    }
     var tapToLock: Bool {
         get { d.object(forKey: "tapToLock") as? Bool ?? true }
         set { d.set(newValue, forKey: "tapToLock") }

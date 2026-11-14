@@ -17,6 +17,7 @@ TIPS
 - Optional: "Enable polish wording" in the menu downloads a small local language model (1.1 GB) that fixes
   grammar and removes stumbles before typing. Still fully offline. Untick it any time to get your exact words.
 - English and Greek are detected automatically. For Telugu or Hindi, switch to the Whisper engine in the menu.
-- Your recent dictations are kept in the menu so you can copy them again; "Clear history" in that submenu
-  deletes them. The app's log never contains what you said unless you turn that on for troubleshooting.
+- No history is kept. If a paste doesn't land, "Copy last dictation" in the menu has your last one for
+  2 minutes (in memory only; it's gone after that or when the app quits). The app's log never contains what
+  you said unless you turn that on for troubleshooting, and that switches itself off when the app quits.
 - Nothing you say ever leaves the Mac. Turn Wi-Fi off and it keeps working.

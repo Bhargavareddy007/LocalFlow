@@ -36,9 +36,9 @@ Requirements: a Mac with an Apple chip (M1 or newer), macOS 26 (Tahoe) or newer,
 
 ## Privacy
 
-Everything stays on the machine. The only network requests the app ever makes are the one-time model downloads from Hugging Face, pinned to an exact file version and verified against a pinned checksum. To type into other apps, LocalFlow briefly puts the text on the clipboard and then puts your previous clipboard back; the text is marked local-only and private, so Universal Clipboard and clipboard managers skip it. It never types into password fields. Recent dictations are kept in a local history file you can clear, or switch off, from the menu. The log never contains dictated text unless you switch that on for troubleshooting.
+Everything stays on the machine. The only network requests the app ever makes are the one-time model downloads from Hugging Face, pinned to an exact file version and verified against a pinned checksum. To type into other apps, LocalFlow briefly puts the text on the clipboard and then puts your previous clipboard back; the text is marked local-only and private, so Universal Clipboard and clipboard managers skip it. It never types into password fields. No history is kept: only your last dictation stays in memory for 2 minutes, so you can copy it again from the menu if a paste didn't land, and nothing is written to disk. The log never contains dictated text unless you switch that on for troubleshooting; that switch turns itself off when the app quits and wipes the log when turned off.
 
-Files live in `~/Library/Application Support/LocalFlow/` (models, history, dictionary) and `~/Library/Logs/LocalFlow.log`.
+Files live in `~/Library/Application Support/LocalFlow/` (models, personal dictionary) and `~/Library/Logs/LocalFlow.log`.
 
 ## Build from source
 

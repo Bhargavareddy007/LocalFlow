@@ -53,6 +53,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             Log.clear()
             UserDefaults.standard.set(true, forKey: "logPurged1")
         }
+        // No dictation record outlives a session: delete the pre-0.2.0 history file, and if dictated text
+        // was being logged for troubleshooting when the app last quit, switch that off and wipe the log.
+        History.deleteLegacyFile()
+        if Settings.shared.verboseLog {
+            Settings.shared.verboseLog = false
+            Log.clear()
+        }
         Log.info("LocalFlow starting (pid \(ProcessInfo.processInfo.processIdentifier))")
         PersonalDictionary.ensureFileExists()
         PersonalDictionary.reload()
@@ -280,35 +287,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         addToggle("Smart spacing before inserted text", s.smartSpacing, #selector(toggleSpacing))
         addToggle("Double-tap key for hands-free mode", s.tapToLock, #selector(toggleTapToLock))
         addToggle("Sounds", s.playSounds, #selector(toggleSounds))
-        addToggle("Write dictated text to the log (for troubleshooting)", s.verboseLog, #selector(toggleVerboseLog))
-        addToggle("Keep recent dictations", s.keepHistory, #selector(toggleKeepHistory))
+        addToggle("Write dictated text to the log (until quit, for troubleshooting)", s.verboseLog, #selector(toggleVerboseLog))
         addToggle("Launch at login", SMAppService.mainApp.status == .enabled, #selector(toggleLaunchAtLogin))
         menu.addItem(.separator())
 
-        // History
-        let historyMenu = NSMenu()
-        let entries = History.shared.entries.prefix(12)
-        if entries.isEmpty {
-            let none = NSMenuItem(title: "Nothing yet", action: nil, keyEquivalent: "")
-            none.isEnabled = false
-            historyMenu.addItem(none)
-        }
-        for entry in entries {
-            var title = entry.text.replacingOccurrences(of: "\n", with: " ")
-            if title.count > 60 { title = String(title.prefix(60)) + "…" }
-            let item = NSMenuItem(title: title, action: #selector(copyHistory(_:)), keyEquivalent: "")
-            item.representedObject = entry.text
+        // Only the last dictation, for two minutes, in case the paste didn't land.
+        if let last = History.shared.last {
+            var preview = last.replacingOccurrences(of: "\n", with: " ")
+            if preview.count > 50 { preview = String(preview.prefix(50)) + "…" }
+            let item = NSMenuItem(title: "Copy last dictation: \u{201C}\(preview)\u{201D}", action: #selector(copyLast), keyEquivalent: "")
             item.target = self
-            item.toolTip = entry.text
-            historyMenu.addItem(item)
+            item.toolTip = last
+            menu.addItem(item)
+        } else {
+            let none = NSMenuItem(title: "Copy last dictation (kept for 2 minutes)", action: nil, keyEquivalent: "")
+            none.isEnabled = false
+            menu.addItem(none)
         }
-        historyMenu.addItem(.separator())
-        let clear = NSMenuItem(title: "Clear history", action: #selector(clearHistory), keyEquivalent: "")
-        clear.target = self
-        historyMenu.addItem(clear)
-        let historyItem = NSMenuItem(title: "Recent dictations (click to copy)", action: nil, keyEquivalent: "")
-        historyItem.submenu = historyMenu
-        menu.addItem(historyItem)
 
         addAction("Setup & permissions…", #selector(showSetup))
         addAction("Edit personal dictionary…", #selector(openDictionary))
@@ -359,12 +354,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func toggleSpacing() { Settings.shared.smartSpacing.toggle() }
     @objc private func toggleTapToLock() { Settings.shared.tapToLock.toggle() }
     @objc private func toggleSounds() { Settings.shared.playSounds.toggle() }
-    @objc private func toggleVerboseLog() { Settings.shared.verboseLog.toggle() }
-
-    /// Turning history off also deletes what was kept.
-    @objc private func toggleKeepHistory() {
-        Settings.shared.keepHistory.toggle()
-        if !Settings.shared.keepHistory { History.shared.clear() }
+    /// Turning it off also deletes the log, which may hold dictated text from while it was on.
+    @objc private func toggleVerboseLog() {
+        Settings.shared.verboseLog.toggle()
+        if !Settings.shared.verboseLog { Log.clear() }
     }
 
     @objc private func toggleLaunchAtLogin() {
@@ -376,14 +369,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
-    @objc private func copyHistory(_ sender: NSMenuItem) {
-        guard let text = sender.representedObject as? String else { return }
+    @objc private func copyLast() {
+        guard let text = History.shared.last else { return }
         TextInserter.copyOnly(text)
-    }
-
-    @objc private func clearHistory() {
-        History.shared.clear()
-        Log.clear()
     }
 
     @objc private func openDictionary() {
@@ -685,7 +673,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 } else {
                     TextInserter.insert(text, smartSpacing: smartSpacing)
                 }
-                History.shared.add(HistoryEntry(date: Date(), text: text, engine: engine.kind.rawValue, seconds: seconds))
+                History.shared.remember(text)
             }
         }
     }

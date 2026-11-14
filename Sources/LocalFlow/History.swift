@@ -1,45 +1,30 @@
 import Foundation
 
-struct HistoryEntry: Codable {
-    let date: Date
-    let text: String
-    let engine: String
-    let seconds: Double
-}
-
+/// The last dictation, kept in memory only and only for a short time, so it can be copied again
+/// from the menu if the paste didn't land. Nothing is written to disk.
 final class History {
     static let shared = History()
-    private(set) var entries: [HistoryEntry] = []
-    private let limit = 300
+    static let lifetime: TimeInterval = 120
 
-    init() { load() }
+    private(set) var last: String?
+    private var expiry: Timer?
 
-    func add(_ entry: HistoryEntry) {
-        guard Settings.shared.keepHistory else { return }
-        entries.insert(entry, at: 0)
-        if entries.count > limit { entries.removeLast(entries.count - limit) }
-        save()
+    func remember(_ text: String) {
+        last = text
+        expiry?.invalidate()
+        expiry = Timer.scheduledTimer(withTimeInterval: Self.lifetime, repeats: false) { [weak self] _ in
+            self?.forget()
+        }
     }
 
-    func clear() {
-        entries = []
-        save()
+    func forget() {
+        last = nil
+        expiry?.invalidate()
+        expiry = nil
     }
 
-    private func load() {
-        guard let data = try? Data(contentsOf: Settings.historyURL) else { return }
-        let dec = JSONDecoder()
-        dec.dateDecodingStrategy = .iso8601
-        entries = (try? dec.decode([HistoryEntry].self, from: data)) ?? []
-    }
-
-    private func save() {
-        let enc = JSONEncoder()
-        enc.dateEncodingStrategy = .iso8601
-        enc.outputFormatting = [.prettyPrinted]
-        guard let data = try? enc.encode(entries) else { return }
-        // Atomic, so a crash mid-write can't empty the file; owner-only, since it holds dictated text.
-        try? data.write(to: Settings.historyURL, options: .atomic)
-        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: Settings.historyURL.path)
+    /// Versions before 0.2.0 kept up to 300 dictations in history.json; remove that file.
+    static func deleteLegacyFile() {
+        try? FileManager.default.removeItem(at: Settings.historyURL)
     }
 }
