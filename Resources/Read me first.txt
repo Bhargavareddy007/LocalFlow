@@ -13,7 +13,8 @@ INSTALL
 TIPS
 - Double-tap fn for hands-free mode (keeps listening); tap once to finish.
 - Say "new line" or "new paragraph" to insert breaks.
-- The waveform icon in the menu bar has all settings, your recent dictations, and a personal dictionary for names it gets wrong.
+- The waveform icon in the menu bar has all settings, your last dictation, and a personal dictionary for names it gets wrong.
+- No fn key (e.g. a PC keyboard)? Pick right ⌘ or right ⌥ as the dictation key in the menu.
 - Optional: "Enable polish wording" in the menu downloads a small local language model (1.1 GB) that fixes
   grammar and removes stumbles before typing. Still fully offline. Untick it any time to get your exact words.
 - English and Greek are detected automatically. For Telugu or Hindi, switch to the Whisper engine in the menu.
