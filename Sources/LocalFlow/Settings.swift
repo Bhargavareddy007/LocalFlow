@@ -71,6 +71,11 @@ final class Settings {
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }()
+    static let recordingsDir: URL = {
+        let url = supportDir.appendingPathComponent("recordings", isDirectory: true)
+        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }()
     static let dictionaryURL = supportDir.appendingPathComponent("dictionary.json")
     static let historyURL = supportDir.appendingPathComponent("history.json")
 
@@ -110,6 +115,9 @@ final class Settings {
         get { d.bool(forKey: "verboseLog") }
         set { d.set(newValue, forKey: "verboseLog") }
     }
+    /// Off by default: keeps the last 30 recordings as WAV files in recordingsDir for troubleshooting.
+    /// Turn on with: defaults write com.bhargava.localflow saveRecordings -bool true
+    var saveRecordings: Bool { d.bool(forKey: "saveRecordings") }
     var tapToLock: Bool {
         get { d.object(forKey: "tapToLock") as? Bool ?? true }
         set { d.set(newValue, forKey: "tapToLock") }

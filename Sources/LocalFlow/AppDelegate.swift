@@ -22,6 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var state: State = .idle
     private var pressTime: Date?
     private var locked = false
+    private var micReady = false
     private var ignoreNextRelease = false
     private var lastShortTap: Date?
     private var lockTimer: Timer?
@@ -73,6 +74,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         recorder.onLevel = { [weak self] level in self?.overlay.push(level: level) }
+        recorder.onReady = { [weak self] in self?.micBecameReady() }
         setupSignalToggle()
     }
 
@@ -505,14 +507,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         state = .recording
         locked = false
+        micReady = false
         target = FocusSnapshot.capture()
         updateIcon()
         overlay.show(engineLoading ? .loading : .recording, message: "Loading model")
+        // Bluetooth mics take up to ~0.6 s to wake; say so if audio hasn't arrived by now.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [weak self] in
+            guard let self = self, self.state == .recording, !self.micReady, !self.engineLoading else { return }
+            self.overlay.show(.loading, message: "Mic starting")
+        }
         // Safety cap for every mode: a missed key release can never leave the mic open indefinitely.
         lockTimer?.invalidate()
         lockTimer = Timer.scheduledTimer(withTimeInterval: 180, repeats: false) { [weak self] _ in
             self?.stopAndTranscribe()
         }
+    }
+
+    /// The start sound plays only once the mic delivers real audio, so it is the cue to start talking:
+    /// words spoken while AirPods are still waking up would be lost.
+    private func micBecameReady() {
+        guard state == .recording, !micReady else { return }
+        micReady = true
+        if !engineLoading { overlay.show(locked ? .locked : .recording) }
         if Settings.shared.playSounds { startSound?.play() }
     }
 
@@ -524,6 +540,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         state = .idle
         overlay.hide()
         updateIcon()
+    }
+
+    /// Troubleshooting only (Settings.saveRecordings): keeps the last 30 recordings as WAV files.
+    private func saveRecording(_ samples: [Float]) {
+        DispatchQueue.global(qos: .utility).async {
+            let fm = FileManager.default
+            let dir = Settings.recordingsDir
+            let stamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
+            do {
+                try AudioRecorder.writeWAV(samples, to: dir.appendingPathComponent("rec-\(stamp).wav"))
+            } catch {
+                Log.info("recording save failed: \(error.localizedDescription)")
+                return
+            }
+            let files = (try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
+            let old = files.filter { $0.pathExtension == "wav" }
+                .sorted { $0.lastPathComponent > $1.lastPathComponent }
+                .dropFirst(30)
+            for url in old { try? fm.removeItem(at: url) }
+        }
     }
 
     private func stopAndTranscribe() {
@@ -538,6 +574,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             state = .idle
             overlay.hide()
             updateIcon()
+            return
+        }
+
+        let level = AudioRecorder.levels(samples)
+        if Settings.shared.saveRecordings { saveRecording(samples) }
+        let levelNote = String(format: " (peak %.0f dB, rms %.0f dB, speech %.0f dB)", level.peak, level.rms, level.speech)
+
+        guard level.speech >= AudioRecorder.minSpeechLevel else {
+            Log.info("skipped \(String(format: "%.1f", seconds))s\(levelNote): too quiet")
+            state = .idle
+            updateIcon()
+            flash("Too quiet — speak up a little", seconds: 1.5)
             return
         }
 
@@ -582,7 +630,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 self.overlay.hide()
                 self.updateIcon()
                 let detail = verbose ? ": \(text) [raw: \(raw)]" : " (\(text.count) chars)"
-                Log.info("transcribed \(String(format: "%.1f", seconds))s with \(engine.kind.rawValue) in \(ms) ms\(polishNote)\(detail)")
+                Log.info("transcribed \(String(format: "%.1f", seconds))s\(levelNote) with \(engine.kind.rawValue) in \(ms) ms\(polishNote)\(detail)")
                 if text.isEmpty {
                     self.flash("Didn't catch that", seconds: 1.2)
                     return
