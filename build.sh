@@ -7,7 +7,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-swift build -c release 2>&1 | grep -v -E "^\[|warning:|ld: warning" | tail -5
+swift build -c release 2>&1 | grep -v -E "^\[" | tail -5
 
 APP=build/LocalFlow.app
 FW="$APP/Contents/Frameworks"
@@ -59,12 +59,21 @@ fi
 IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | grep -o '"Developer ID Application[^"]*"' | head -1 | tr -d '"' || true)
 [ -z "$IDENTITY" ] && IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | grep -o '"Apple Development[^"]*"' | head -1 | tr -d '"' || true)
 [ -z "$IDENTITY" ] && IDENTITY="-"
-for lib in "$FW"/*; do
-  codesign --force --sign "$IDENTITY" --options runtime --timestamp "$lib" 2>&1 | grep -v "replacing existing" || true
-done
-codesign --force --sign "$IDENTITY" --options runtime --timestamp \
-  --entitlements Resources/LocalFlow.entitlements "$APP" 2>&1 | grep -v "replacing existing" || true
-codesign --verify --deep --strict "$APP" && echo "signed with: $IDENTITY"
+case "${1:-}" in
+  notarize|zip)
+    # A build meant for other Macs must carry the Developer ID signature, never an ad-hoc one.
+    [[ "$IDENTITY" == "Developer ID Application"* ]] || { echo "ERROR: no Developer ID Application identity in the keychain"; exit 1; } ;;
+esac
+sign() {
+  local out
+  if ! out=$(codesign --force --sign "$IDENTITY" --options runtime --timestamp "$@" 2>&1); then
+    echo "$out"; echo "ERROR: signing failed: ${*: -1}"; exit 1
+  fi
+}
+for lib in "$FW"/*; do sign "$lib"; done
+sign --entitlements Resources/LocalFlow.entitlements "$APP"
+codesign --verify --deep --strict "$APP"
+echo "signed with: $IDENTITY"
 du -sh "$APP" | awk '{print "built " $2 " (" $1 ")"}'
 
 case "${1:-}" in
@@ -96,11 +105,12 @@ case "${1:-}" in
       exit 1
     fi ;;
   zip)
+    # Not notarized, so it gets its own name and never replaces the notarized ~/Desktop/LocalFlow.zip.
     STAGE=$(mktemp -d)/LocalFlow
     mkdir -p "$STAGE"
     cp -R "$APP" "$STAGE/"
     cp "Resources/Read me first.txt" "$STAGE/"
-    rm -f ~/Desktop/LocalFlow.zip
-    ditto -c -k --sequesterRsrc --keepParent "$STAGE" ~/Desktop/LocalFlow.zip
-    ls -la ~/Desktop/LocalFlow.zip ;;
+    rm -f ~/Desktop/LocalFlow-unnotarized.zip
+    ditto -c -k --sequesterRsrc --keepParent "$STAGE" ~/Desktop/LocalFlow-unnotarized.zip
+    ls -la ~/Desktop/LocalFlow-unnotarized.zip ;;
 esac

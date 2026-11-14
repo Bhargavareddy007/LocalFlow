@@ -12,20 +12,20 @@ struct ModelInfo {
     static let parakeet = ModelInfo(
         engine: .parakeet,
         fileName: "ggml-parakeet-tdt-0.6b-v3-q8_0.bin",
-        url: URL(string: "https://huggingface.co/ggml-org/parakeet-GGUF/resolve/main/ggml-parakeet-tdt-0.6b-v3-q8_0.bin")!,
+        url: URL(string: "https://huggingface.co/ggml-org/parakeet-GGUF/resolve/35156454d1a39de06863303dd209fd2bed6ee079/ggml-parakeet-tdt-0.6b-v3-q8_0.bin")!,
         sizeMB: 669, bytes: 668_757_119,
         sha256: "4d64e9e96c2792186d072fde0034df0ad670cf680a2f53069052ead827fd600e")
     static let whisper = ModelInfo(
         engine: .whisper,
         fileName: "ggml-large-v3-turbo-q5_0.bin",
-        url: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin")!,
+        url: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-large-v3-turbo-q5_0.bin")!,
         sizeMB: 574, bytes: 574_041_195,
         sha256: "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2")
 
     static let polish = ModelInfo(
         engine: nil,
         fileName: "qwen2.5-1.5b-instruct-q4_k_m.gguf",
-        url: URL(string: "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf")!,
+        url: URL(string: "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/91cad51170dc346986eccefdc2dd33a9da36ead9/qwen2.5-1.5b-instruct-q4_k_m.gguf")!,
         sizeMB: 1117, bytes: 1_117_320_736,
         sha256: "6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e")
 

@@ -15,6 +15,7 @@ final class History {
     init() { load() }
 
     func add(_ entry: HistoryEntry) {
+        guard Settings.shared.keepHistory else { return }
         entries.insert(entry, at: 0)
         if entries.count > limit { entries.removeLast(entries.count - limit) }
         save()
@@ -36,6 +37,9 @@ final class History {
         let enc = JSONEncoder()
         enc.dateEncodingStrategy = .iso8601
         enc.outputFormatting = [.prettyPrinted]
-        if let data = try? enc.encode(entries) { try? data.write(to: Settings.historyURL) }
+        guard let data = try? enc.encode(entries) else { return }
+        // Atomic, so a crash mid-write can't empty the file; owner-only, since it holds dictated text.
+        try? data.write(to: Settings.historyURL, options: .atomic)
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: Settings.historyURL.path)
     }
 }

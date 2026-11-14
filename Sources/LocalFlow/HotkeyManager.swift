@@ -6,8 +6,8 @@ import CoreGraphics
 final class HotkeyManager {
     var onPress: (() -> Void)?
     var onRelease: (() -> Void)?
-    /// Fired when another key is pressed while the fn hotkey is held
-    /// (e.g. fn+Delete). The recording is cancelled so shortcuts keep working.
+    /// Fired when another key is pressed (or, for modifier hotkeys, the mouse clicked) while the
+    /// dictation key is held (e.g. fn+Delete, right-⌘C). The recording is cancelled so shortcuts keep working.
     var onInterrupt: (() -> Void)?
 
     private var tap: CFMachPort?
@@ -27,7 +27,10 @@ final class HotkeyManager {
         if tap != nil { return true }
         let mask: CGEventMask =
             (1 << CGEventType.flagsChanged.rawValue) |
-            (1 << CGEventType.keyDown.rawValue)
+            (1 << CGEventType.keyDown.rawValue) |
+            (1 << CGEventType.leftMouseDown.rawValue) |
+            (1 << CGEventType.rightMouseDown.rawValue) |
+            (1 << CGEventType.otherMouseDown.rawValue)
 
         let callback: CGEventTapCallBack = { _, type, event, refcon in
             guard let refcon = refcon else { return Unmanaged.passUnretained(event) }
@@ -84,25 +87,40 @@ final class HotkeyManager {
             }
             if type == .keyDown && isDown && flags.contains(.maskSecondaryFn) {
                 // fn + some other key: this is a shortcut, not dictation.
-                isDown = false
-                DispatchQueue.main.async { self.onInterrupt?() }
+                interrupt()
             }
         case .rightOption:
             // Device-specific bit for the RIGHT option key, so a held left option does not mask the release.
             if type == .flagsChanged && keyCode == Self.rightOptionKeyCode {
                 update(down: flags.rawValue & Self.rightOptionDeviceBit != 0)
+            } else if isDown && Self.isOtherInput(type) {
+                interrupt()
             }
         case .rightCommand:
             if type == .flagsChanged && keyCode == Self.rightCommandKeyCode {
                 update(down: flags.rawValue & Self.rightCommandDeviceBit != 0)
+            } else if isDown && Self.isOtherInput(type) {
+                interrupt()
             }
         case .controlOption:
             if type == .flagsChanged {
                 let both = flags.contains(.maskControl) && flags.contains(.maskAlternate)
                 update(down: both)
+            } else if isDown && Self.isOtherInput(type) {
+                interrupt()
             }
         }
         return Unmanaged.passUnretained(event)
+    }
+
+    /// A key or click while a modifier hotkey is held means a shortcut (⌘C, ⌥-click, ⌃⌥→), not dictation.
+    private static func isOtherInput(_ type: CGEventType) -> Bool {
+        type == .keyDown || type == .leftMouseDown || type == .rightMouseDown || type == .otherMouseDown
+    }
+
+    private func interrupt() {
+        isDown = false
+        DispatchQueue.main.async { self.onInterrupt?() }
     }
 
     private func update(down: Bool) {

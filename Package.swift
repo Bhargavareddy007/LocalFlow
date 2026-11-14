@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "LocalFlow",
-    platforms: [.macOS(.v14)],
+    platforms: [.macOS("26.0")],
     targets: [
         .systemLibrary(name: "CWhisper", path: "Sources/CWhisper"),
         .executableTarget(

@@ -1,7 +1,7 @@
 LocalFlow — voice typing that stays on your Mac
 ================================================
 
-Needs: a Mac with an Apple chip (M1 or newer), macOS 14 or newer, internet once (for a 669 MB speech model).
+Needs: a Mac with an Apple chip (M1 or newer), macOS 26 (Tahoe) or newer, internet once (for a 669 MB speech model).
 
 INSTALL
 1. Drag LocalFlow.app into your Applications folder and double-click it.

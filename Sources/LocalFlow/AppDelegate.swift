@@ -40,6 +40,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // MARK: - Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Two copies (say one in Downloads, one in Applications) would both record and paste every dictation.
+        if let id = Bundle.main.bundleIdentifier,
+           let other = NSRunningApplication.runningApplications(withBundleIdentifier: id)
+               .first(where: { $0 != NSRunningApplication.current }) {
+            Log.info("another LocalFlow is already running (pid \(other.processIdentifier)); quitting")
+            exit(0)
+        }
         Log.rotateIfNeeded()
         if !UserDefaults.standard.bool(forKey: "logPurged1") {
             // Versions before 0.1.1 wrote dictated text into the log; remove any such log once.
@@ -75,11 +82,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         recorder.onLevel = { [weak self] level in self?.overlay.push(level: level) }
         recorder.onReady = { [weak self] in self?.micBecameReady() }
-        setupSignalToggle()
+        if Settings.shared.signalToggle { setupSignalToggle() }
     }
 
     /// `kill -USR1 $(pgrep -x LocalFlow)` toggles hands-free dictation — handy for
-    /// Raycast / Keyboard Maestro / Stream Deck and for testing.
+    /// Raycast / Keyboard Maestro / Stream Deck and for testing. Off unless Settings.signalToggle is set,
+    /// since any process of the same user could otherwise turn the mic on.
     private func setupSignalToggle() {
         signal(SIGUSR1, SIG_IGN)
         let src = DispatchSource.makeSignalSource(signal: SIGUSR1, queue: .main)
@@ -273,6 +281,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         addToggle("Double-tap key for hands-free mode", s.tapToLock, #selector(toggleTapToLock))
         addToggle("Sounds", s.playSounds, #selector(toggleSounds))
         addToggle("Write dictated text to the log (for troubleshooting)", s.verboseLog, #selector(toggleVerboseLog))
+        addToggle("Keep recent dictations", s.keepHistory, #selector(toggleKeepHistory))
         addToggle("Launch at login", SMAppService.mainApp.status == .enabled, #selector(toggleLaunchAtLogin))
         menu.addItem(.separator())
 
@@ -352,6 +361,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func toggleSounds() { Settings.shared.playSounds.toggle() }
     @objc private func toggleVerboseLog() { Settings.shared.verboseLog.toggle() }
 
+    /// Turning history off also deletes what was kept.
+    @objc private func toggleKeepHistory() {
+        Settings.shared.keepHistory.toggle()
+        if !Settings.shared.keepHistory { History.shared.clear() }
+    }
+
     @objc private func toggleLaunchAtLogin() {
         do {
             if SMAppService.mainApp.status == .enabled { try SMAppService.mainApp.unregister() }
@@ -363,8 +378,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func copyHistory(_ sender: NSMenuItem) {
         guard let text = sender.representedObject as? String else { return }
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
+        TextInserter.copyOnly(text)
     }
 
     @objc private func clearHistory() {
@@ -452,7 +466,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func setupHotkeys() {
         hotkeys.onPress = { [weak self] in self?.hotkeyPressed() }
         hotkeys.onRelease = { [weak self] in self?.hotkeyReleased() }
-        hotkeys.onInterrupt = { [weak self] in self?.cancelRecording() }
+        hotkeys.onInterrupt = { [weak self] in self?.hotkeyInterrupted() }
+    }
+
+    /// The key was part of a shortcut: drop the recording, and with it any half-finished tap or
+    /// pending release, so the shortcut can't start hands-free mode or swallow the next release.
+    private func hotkeyInterrupted() {
+        lastShortTap = nil
+        ignoreNextRelease = false
+        cancelRecording()
     }
 
     private func hotkeyPressed() {
@@ -498,6 +520,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func startRecording() {
         hideTimer?.invalidate()
+        let focus = FocusSnapshot.capture()
+        if focus.isSecureField {
+            flash("Password field — dictation is off here", seconds: 2)
+            return
+        }
         do {
             try recorder.start()
         } catch {
@@ -508,7 +535,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         state = .recording
         locked = false
         micReady = false
-        target = FocusSnapshot.capture()
+        target = focus
         updateIcon()
         overlay.show(engineLoading ? .loading : .recording, message: "Loading model")
         // Bluetooth mics take up to ~0.6 s to wake; say so if audio hasn't arrived by now.
@@ -519,8 +546,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // Safety cap for every mode: a missed key release can never leave the mic open indefinitely.
         lockTimer?.invalidate()
         lockTimer = Timer.scheduledTimer(withTimeInterval: 180, repeats: false) { [weak self] _ in
-            self?.stopAndTranscribe()
+            self?.capReached()
         }
+    }
+
+    /// Three minutes is almost always a mic left on by accident (e.g. a stray double-tap),
+    /// so the recording is thrown away rather than typed into whatever has focus.
+    private func capReached() {
+        guard state == .recording else { return }
+        Log.info("recording reached the 3-minute cap: discarded")
+        cancelRecording()
+        flash("Stopped after 3 minutes — nothing was typed", seconds: 3)
     }
 
     /// The start sound plays only once the mic delivers real audio, so it is the cue to start talking:
@@ -635,8 +671,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     self.flash("Didn't catch that", seconds: 1.2)
                     return
                 }
+                let now = FocusSnapshot.capture()
+                // Never type into, or keep a record of, what was said with a password field focused.
+                if now.isSecureField {
+                    Log.info("focus is in a password field: dictation discarded")
+                    self.flash("Password field — nothing was typed", seconds: 2.5)
+                    return
+                }
                 // Paste only into the app, window and field the user was in when they started talking.
-                if let target = target, !target.stillCurrent(FocusSnapshot.capture()) {
+                if let target = target, !target.stillCurrent(now) {
                     TextInserter.copyOnly(text)
                     self.flash("Copied — focus moved. Press ⌘V where you want it.", seconds: 3)
                 } else {

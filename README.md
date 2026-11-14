@@ -3,7 +3,7 @@
 [![Download](https://img.shields.io/github/v/release/Bhargavareddy007/LocalFlow?label=Download&color=2ea44f)](https://github.com/Bhargavareddy007/LocalFlow/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/Bhargavareddy007/LocalFlow/total?label=downloads)](https://github.com/Bhargavareddy007/LocalFlow/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![macOS 14+ · Apple silicon](https://img.shields.io/badge/macOS%2014%2B-Apple%20silicon-lightgrey)
+![macOS 26+ · Apple silicon](https://img.shields.io/badge/macOS%2026%2B-Apple%20silicon-lightgrey)
 
 Voice typing for macOS that never leaves your Mac. Hold a key, talk, let go: the words appear wherever your cursor is. An offline alternative to Wispr Flow.
 
@@ -20,7 +20,7 @@ Voice typing for macOS that never leaves your Mac. Hold a key, talk, let go: the
 3. A setup window downloads the speech model (669 MB, one time) and asks for two permissions: Microphone, and Accessibility (so it can see the hotkey and type into other apps).
 4. Hold **fn**, talk, release.
 
-Requirements: a Mac with an Apple chip (M1 or newer), macOS 14 or newer, internet once for the model download.
+Requirements: a Mac with an Apple chip (M1 or newer), macOS 26 (Tahoe) or newer, internet once for the model download.
 
 ## Features
 
@@ -36,7 +36,7 @@ Requirements: a Mac with an Apple chip (M1 or newer), macOS 14 or newer, interne
 
 ## Privacy
 
-Everything stays on the machine. The only network requests the app ever makes are the one-time model downloads from Hugging Face, each verified against a pinned checksum. Recent dictations are kept in a local history file you can clear from the menu. The log never contains dictated text unless you switch that on for troubleshooting.
+Everything stays on the machine. The only network requests the app ever makes are the one-time model downloads from Hugging Face, pinned to an exact file version and verified against a pinned checksum. To type into other apps, LocalFlow briefly puts the text on the clipboard and then puts your previous clipboard back; the text is marked local-only and private, so Universal Clipboard and clipboard managers skip it. It never types into password fields. Recent dictations are kept in a local history file you can clear, or switch off, from the menu. The log never contains dictated text unless you switch that on for troubleshooting.
 
 Files live in `~/Library/Application Support/LocalFlow/` (models, history, dictionary) and `~/Library/Logs/LocalFlow.log`.
 

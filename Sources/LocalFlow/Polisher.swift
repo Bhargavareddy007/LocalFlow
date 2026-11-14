@@ -3,6 +3,8 @@ import Foundation
 
 /// Rewrites a raw transcript into clean written text with a small local language model (llama.cpp).
 final class Polisher {
+    /// llama_decode aborts the whole process if one batch holds more tokens than this.
+    private static let batchSize = 1024
     private var model: OpaquePointer?
     private var ctx: OpaquePointer?
     private var sampler: UnsafeMutablePointer<llama_sampler>?
@@ -36,7 +38,7 @@ final class Polisher {
         model = m
         var cp = llama_context_default_params()
         cp.n_ctx = 2048
-        cp.n_batch = 1024
+        cp.n_batch = UInt32(Self.batchSize)
         cp.n_ubatch = 512
         cp.n_threads = Int32(min(8, ProcessInfo.processInfo.activeProcessorCount))
         cp.n_threads_batch = cp.n_threads
@@ -79,6 +81,8 @@ final class Polisher {
         }
         guard n > 0 else { return nil }
         tokens.removeSubrange(Int(n)...)
+        // A long dictation would overflow the batch and crash the app; deliver it unpolished instead.
+        guard Int(n) <= Self.batchSize else { return nil }
 
         let promptOK: Bool = tokens.withUnsafeMutableBufferPointer { buf in
             llama_decode(ctx, llama_batch_get_one(buf.baseAddress, Int32(buf.count))) == 0

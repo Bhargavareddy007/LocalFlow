@@ -88,7 +88,7 @@ final class Settings {
         set { d.set(newValue.rawValue, forKey: "engine") }
     }
     var language: String {
-        get { d.string(forKey: "language") ?? "en" }
+        get { d.string(forKey: "language") ?? "auto" }
         set { d.set(newValue, forKey: "language") }
     }
     var removeFillers: Bool {
@@ -118,6 +118,14 @@ final class Settings {
     /// Off by default: keeps the last 30 recordings as WAV files in recordingsDir for troubleshooting.
     /// Turn on with: defaults write com.bhargava.localflow saveRecordings -bool true
     var saveRecordings: Bool { d.bool(forKey: "saveRecordings") }
+    /// Off by default: `kill -USR1` toggles hands-free dictation (for Raycast / Keyboard Maestro / testing).
+    /// Left off because any local process could use it to turn the mic on.
+    /// Turn on with: defaults write com.bhargava.localflow signalToggle -bool true
+    var signalToggle: Bool { d.bool(forKey: "signalToggle") }
+    var keepHistory: Bool {
+        get { d.object(forKey: "keepHistory") as? Bool ?? true }
+        set { d.set(newValue, forKey: "keepHistory") }
+    }
     var tapToLock: Bool {
         get { d.object(forKey: "tapToLock") as? Bool ?? true }
         set { d.set(newValue, forKey: "tapToLock") }

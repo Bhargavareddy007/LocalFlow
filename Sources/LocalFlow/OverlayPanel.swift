@@ -105,7 +105,7 @@ final class PillView: NSView {
                 .font: NSFont.systemFont(ofSize: 11.5, weight: .medium),
                 .foregroundColor: NSColor(calibratedWhite: 0.85, alpha: 1),
             ]
-            let label = "tap fn to stop"
+            let label = "tap \(Settings.shared.hotkey.shortName) to stop"
             let size = label.size(withAttributes: attrs)
             label.draw(at: NSPoint(x: rect.maxX - size.width - 30, y: rect.midY - size.height / 2), withAttributes: attrs)
         case .transcribing:
