@@ -119,6 +119,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         hotkeys.stop()
         if recorder.isRecording { _ = recorder.stop() }
         workQueue.sync { self.engine = nil; self.polisher = nil } // release Metal buffers cleanly
+        // "Until quit": dictated text logged for troubleshooting doesn't stay on disk after the app quits.
+        // (After a crash, the same cleanup runs at the next launch.)
+        if Settings.shared.verboseLog {
+            Settings.shared.verboseLog = false
+            Log.clear()
+        }
     }
 
     // MARK: - Setup window & model downloads
@@ -621,7 +627,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let removeFillers = Settings.shared.removeFillers
         let smartSpacing = Settings.shared.smartSpacing
         let usePolish = Settings.shared.polishEnabled
-        let verbose = Settings.shared.verboseLog
         let target = self.target
 
         workQueue.async { [weak self] in
@@ -662,7 +667,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     self.flash("Password field — nothing was typed", seconds: 2.5)
                     return
                 }
-                let detail = verbose ? ": \(text) [raw: \(raw)]" : " (\(text.count) chars)"
+                // Read the switch now, not when recording stopped: if it was turned off (and the log wiped)
+                // while this dictation was processing, its text must not be written back.
+                let detail = Settings.shared.verboseLog ? ": \(text) [raw: \(raw)]" : " (\(text.count) chars)"
                 Log.info("\(summary)\(detail)")
                 if text.isEmpty {
                     self.flash("Didn't catch that", seconds: 1.2)
