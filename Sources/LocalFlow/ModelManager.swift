@@ -98,6 +98,12 @@ final class ModelManager: NSObject, URLSessionDownloadDelegate {
                     didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
         lock.lock(); let info = active[downloadTask.taskIdentifier]; lock.unlock()
         guard let info = info else { return }
+        // The exact size is pinned, so anything bigger is wrong: stop now rather than fill the disk first.
+        if totalBytesWritten > Int64(info.bytes) {
+            lock.lock(); failures[downloadTask.taskIdentifier] = "download is larger than the expected \(info.bytes) bytes"; lock.unlock()
+            downloadTask.cancel()
+            return
+        }
         let expected = totalBytesExpectedToWrite > 0 ? Double(totalBytesExpectedToWrite) : Double(info.sizeMB) * 1_000_000
         let fraction = min(1, Double(totalBytesWritten) / expected)
         DispatchQueue.main.async { self.onProgress?(info, fraction) }
@@ -127,7 +133,10 @@ final class ModelManager: NSObject, URLSessionDownloadDelegate {
         lock.unlock()
         guard let info = info else { return }
         var finalError = error
-        if error == nil, !ok {
+        if let failure = failure, !ok {
+            // Our own reason (rejected file, oversized download) beats the generic "cancelled".
+            finalError = NSError(domain: "LocalFlow", code: 2, userInfo: [NSLocalizedDescriptionKey: failure])
+        } else if error == nil, !ok {
             finalError = NSError(domain: "LocalFlow", code: 2,
                                  userInfo: [NSLocalizedDescriptionKey: failure ?? "Download did not complete"])
         }

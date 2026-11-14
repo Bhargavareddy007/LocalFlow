@@ -10,10 +10,12 @@ enum Log {
         return f
     }()
 
+    private static let maxBytes = 1_000_000
+
     /// Keep the log small: if it grew past 1 MB, start over.
     static func rotateIfNeeded() {
         let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int) ?? 0
-        if size > 1_000_000 { try? FileManager.default.removeItem(at: url) }
+        if size > maxBytes { try? FileManager.default.removeItem(at: url) }
     }
 
     static func clear() {
@@ -25,7 +27,13 @@ enum Log {
         fputs(line, stderr)
         queue.async {
             if let h = try? FileHandle(forWritingTo: url) {
-                h.seekToEndOfFile()
+                // The same 1 MB limit during long sessions, not only at launch: start over.
+                if h.seekToEndOfFile() > UInt64(maxBytes) {
+                    try? h.close()
+                    try? FileManager.default.removeItem(at: url)
+                    try? line.data(using: .utf8)!.write(to: url)
+                    return
+                }
                 h.write(line.data(using: .utf8)!)
                 try? h.close()
             } else {

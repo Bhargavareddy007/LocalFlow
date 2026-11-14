@@ -653,17 +653,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 self.state = .idle
                 self.overlay.hide()
                 self.updateIcon()
-                let detail = verbose ? ": \(text) [raw: \(raw)]" : " (\(text.count) chars)"
-                Log.info("transcribed \(String(format: "%.1f", seconds))s\(levelNote) with \(engine.kind.rawValue) in \(ms) ms\(polishNote)\(detail)")
-                if text.isEmpty {
-                    self.flash("Didn't catch that", seconds: 1.2)
+                let now = FocusSnapshot.capture()
+                let summary = "transcribed \(String(format: "%.1f", seconds))s\(levelNote) with \(engine.kind.rawValue) in \(ms) ms\(polishNote)"
+                // Never type into, or keep any record of, what was said with a password field focused —
+                // checked before logging, so not even the troubleshooting log gets the text.
+                if now.isSecureField {
+                    Log.info("\(summary); focus is in a password field: dictation discarded")
+                    self.flash("Password field — nothing was typed", seconds: 2.5)
                     return
                 }
-                let now = FocusSnapshot.capture()
-                // Never type into, or keep a record of, what was said with a password field focused.
-                if now.isSecureField {
-                    Log.info("focus is in a password field: dictation discarded")
-                    self.flash("Password field — nothing was typed", seconds: 2.5)
+                let detail = verbose ? ": \(text) [raw: \(raw)]" : " (\(text.count) chars)"
+                Log.info("\(summary)\(detail)")
+                if text.isEmpty {
+                    self.flash("Didn't catch that", seconds: 1.2)
                     return
                 }
                 // Paste only into the app, window and field the user was in when they started talking.
