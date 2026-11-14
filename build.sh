@@ -87,7 +87,8 @@ case "${1:-}" in
     TMPZIP=$(mktemp -d)/LocalFlow-notarize.zip
     ditto -c -k --sequesterRsrc --keepParent "$APP" "$TMPZIP"
     echo "submitting to Apple notarization service..."
-    xcrun notarytool submit "$TMPZIP" --keychain-profile LocalFlow --wait 2>&1 | tee build/notarize.log | grep -E "id:|status:" | tail -3
+    # `|| true`: a failed submission must reach the error report below instead of exiting silently.
+    xcrun notarytool submit "$TMPZIP" --keychain-profile LocalFlow --wait 2>&1 | tee build/notarize.log | grep -E "id:|status:" | tail -3 || true
     if grep -q "status: Accepted" build/notarize.log; then
       xcrun stapler staple "$APP" | tail -1
       spctl --assess --type execute -vv "$APP" 2>&1 | head -2
@@ -100,7 +101,8 @@ case "${1:-}" in
       ls -la ~/Desktop/LocalFlow.zip
     else
       echo "notarization was not accepted; see build/notarize.log"
-      SUB=$(grep -m1 "id:" build/notarize.log | awk '{print $2}')
+      grep -E "^Error" build/notarize.log || true
+      SUB=$(grep -m1 "id:" build/notarize.log | awk '{print $2}' || true)
       [ -n "$SUB" ] && xcrun notarytool log "$SUB" --keychain-profile LocalFlow 2>&1 | head -40
       exit 1
     fi ;;
