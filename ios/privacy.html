@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LocalFlow Privacy Policy</title>
+<meta name="description" content="LocalFlow collects no data. Audio and text stay on your iPhone.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<header>
+  <img src="icon.png" alt="">
+  <h1>Privacy Policy</h1>
+</header>
+<p class="tagline">LocalFlow for iPhone · Last updated 15 November 2026</p>
+
+<p>LocalFlow is a dictation app and keyboard for iPhone. It runs entirely on your device.</p>
+
+<h2>What we collect</h2>
+<p>Nothing. LocalFlow has no accounts, no analytics, no advertising, no crash reporting of its own and no servers. We do not receive, store or process any of your data.</p>
+
+<h2>Audio and text</h2>
+<ul>
+  <li>Audio from the microphone is transcribed by a speech model running on your iPhone (NVIDIA Parakeet via whisper.cpp). Audio never leaves the phone and is never written to disk.</li>
+  <li>The text you dictate is kept only in the app's memory and is forgotten two minutes after you insert, copy or share it. The text reaches the LocalFlow keyboard through a private container shared only between the app and its keyboard (an App Group), and is removed as soon as the keyboard has inserted it, or after two minutes at the latest.</li>
+  <li>When you choose a writing style other than "As spoken", the final text is rewritten by Apple's on-device model (Apple Intelligence). This also happens on your iPhone.</li>
+  <li>While "Listening for the keyboard" is on, the app keeps the microphone open in the background so the keyboard can start a dictation without switching apps, and iOS shows the orange microphone indicator. Until you tap the keyboard's mic key, the audio is discarded as it arrives and nothing is kept or transcribed. You can turn this off, or have it switch off automatically after a period without dictation.</li>
+  <li>Words you add to the personal dictionary are stored on your iPhone only.</li>
+</ul>
+
+<h2>Network use</h2>
+<p>The only network request LocalFlow makes is the one-time download of the speech model file (about 670 MB) from Hugging Face (huggingface.co), pinned to an exact file version and verified against a checksum. Like any download, it shows your IP address to Hugging Face. It contains no other information about you. After the download, LocalFlow works with the network off. The keyboard contains no networking code at all.</p>
+
+<h2>Full Access</h2>
+<p>iOS asks you to allow "Full Access" for the LocalFlow keyboard. LocalFlow needs it only so the keyboard can read the text the app hands back through the shared container. The keyboard does not use the network, does not collect what you type and does not store anything.</p>
+
+<h2>Permissions</h2>
+<ul>
+  <li>Microphone: to record your dictation on the device.</li>
+  <li>Background audio: to keep the microphone available for the keyboard, as described above.</li>
+</ul>
+
+<h2>Children</h2>
+<p>LocalFlow does not collect data from anyone, including children. It is rated 4+.</p>
+
+<h2>Changes</h2>
+<p>If this policy changes, the new version is published on this page with the date above.</p>
+
+<h2>Contact</h2>
+<p>Questions about this policy: <a href="https://github.com/Bhargavareddy007/LocalFlow/issues">github.com/Bhargavareddy007/LocalFlow/issues</a></p>
+
+<footer>
+  <a href="index.html">Support</a>
+  <span>© 2026 Bhargava Reddy Sankuru</span>
+</footer>
+</main>
+</body>
+</html>

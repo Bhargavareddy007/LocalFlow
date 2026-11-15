@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LocalFlow Support</title>
+<meta name="description" content="Help for LocalFlow, private offline dictation and keyboard for iPhone.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<header>
+  <img src="icon.png" alt="">
+  <h1>LocalFlow</h1>
+</header>
+<p class="tagline">Private, offline dictation for iPhone. Your voice never leaves the phone.</p>
+
+<h2>Set up</h2>
+<ol>
+  <li>Open LocalFlow once. It downloads the speech model (about 670 MB, one time) and asks for the microphone.</li>
+  <li>Add the keyboard: Settings › General › Keyboard › Keyboards › Add New Keyboard › LocalFlow.</li>
+  <li>Tap LocalFlow in that list and turn on <strong>Allow Full Access</strong>. The keyboard needs it only to receive the text from the app. It contains no networking code.</li>
+  <li>In any app, switch to the LocalFlow keyboard with the globe key, tap the mic, speak, and tap the check mark.</li>
+</ol>
+
+<h2>Questions</h2>
+<div class="card">
+  <p><strong>Why is the orange microphone dot on?</strong></p>
+  <p>iOS does not let a keyboard use the microphone, and only lets an app continue a recording it started while on screen. While "Listening for the keyboard" is on, LocalFlow keeps the microphone open in the background and throws the audio away until you tap the keyboard's mic. Turn it off, or choose when it switches off, in LocalFlow › Settings › Keyboard.</p>
+</div>
+<div class="card">
+  <p><strong>The keyboard opened the LocalFlow app. Why?</strong></p>
+  <p>That happens after a restart, a phone call, an update or the idle timeout, when the microphone was closed. LocalFlow starts listening again; go back to your app and keep talking. The next dictation works in place.</p>
+</div>
+<div class="card">
+  <p><strong>Which languages does it understand?</strong></p>
+  <p>English, Greek and 23 more European languages, detected automatically. Writing styles (Formal, Casual and so on) use Apple Intelligence and need an iPhone 15 Pro or newer.</p>
+</div>
+<div class="card">
+  <p><strong>A name keeps coming out wrong.</strong></p>
+  <p>Add it to the dictionary: on the keyboard tap ≡ › Add word to dictionary, or LocalFlow › Settings › Dictionary.</p>
+</div>
+<div class="card">
+  <p><strong>Does anything go online?</strong></p>
+  <p>Only the one-time model download from Hugging Face. After that LocalFlow works in airplane mode. There are no accounts, analytics or servers. See the <a href="privacy.html">privacy policy</a>.</p>
+</div>
+
+<h2>Contact</h2>
+<p>Open an issue at <a href="https://github.com/Bhargavareddy007/LocalFlow/issues">github.com/Bhargavareddy007/LocalFlow/issues</a>. Please include your iPhone model and iOS version, and never paste anything private.</p>
+
+<footer>
+  <a href="privacy.html">Privacy policy</a>
+  <span>© 2026 Bhargava Reddy Sankuru</span>
+</footer>
+</main>
+</body>
+</html>
