@@ -30,7 +30,7 @@
 </ul>
 
 <h2>Network use</h2>
-<p>The only network request LocalFlow makes is the one-time download of the speech model file (about 670 MB) from Hugging Face (huggingface.co), pinned to an exact file version and verified against a checksum. Like any download, it shows your IP address to Hugging Face. It contains no other information about you. After the download, LocalFlow works with the network off. The keyboard contains no networking code at all.</p>
+<p>None. LocalFlow never connects to the internet. The speech model is part of the app you download from the App Store, and neither the app nor its keyboard contains any networking code. It works the same in airplane mode.</p>
 
 <h2>Full Access</h2>
 <p>iOS asks you to allow "Full Access" for the LocalFlow keyboard. LocalFlow needs it only so the keyboard can read the text the app hands back through the shared container. The keyboard does not use the network, does not collect what you type and does not store anything.</p>
