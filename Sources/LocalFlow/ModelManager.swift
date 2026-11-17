@@ -112,12 +112,36 @@ final class ModelManager: NSObject, URLSessionDownloadDelegate {
     /// from the returned bytes, never from the file, so nothing on disk can change between the check and the
     /// load: the folder is writable by any process of the user, and the model parsers are C/C++ code.
     /// A file that fails is renamed to `.rejected`, so the app downloads a fresh copy instead of loading it.
+    /// Used for the speech models.
     static func readVerified(_ path: String, _ info: ModelInfo) -> VerifiedModel? {
+        checked(path, info, "read and verified") { try readAndCheck(path, info) }
+    }
+
+    /// The polish model takes a different route, because a 1.1 GB copy in memory would stay in the app's
+    /// footprint for as long as the model is loaded: the file is opened once, hashed through that descriptor,
+    /// and the same open file goes to the loader, which maps it. Renaming or replacing the file has no effect
+    /// once it's open; a process of the same user could still change the opened file in place while it loads.
+    static func openVerified(_ path: String, _ info: ModelInfo) -> UnsafeMutablePointer<FILE>? {
+        checked(path, info, "verified") {
+            let fd = try openChecked(path, info)
+            do {
+                try hashCheck(fd, info)
+                guard lseek(fd, 0, SEEK_SET) == 0, let f = fdopen(fd, "rb") else { throw fail("cannot reopen") }
+                return f
+            } catch {
+                close(fd)
+                throw error
+            }
+        }
+    }
+
+    /// Runs a check; a file that fails is renamed to `.rejected`, so the app downloads a fresh copy.
+    private static func checked<T>(_ path: String, _ info: ModelInfo, _ verb: String, _ body: () throws -> T) -> T? {
         let t0 = Date()
         do {
-            let model = try readAndCheck(path, info)
-            Log.info("model: \(info.fileName) read and verified in \(Int(Date().timeIntervalSince(t0) * 1000)) ms")
-            return model
+            let result = try body()
+            Log.info("model: \(info.fileName) \(verb) in \(Int(Date().timeIntervalSince(t0) * 1000)) ms")
+            return result
         } catch {
             Log.info("model: \(path) failed verification (\(error.localizedDescription)); not loaded")
             let rejected = path + ".rejected"
@@ -127,17 +151,51 @@ final class ModelManager: NSObject, URLSessionDownloadDelegate {
         }
     }
 
-    private static func readAndCheck(_ path: String, _ info: ModelInfo) throws -> VerifiedModel {
-        func fail(_ msg: String) -> Error {
-            NSError(domain: "LocalFlow", code: 3, userInfo: [NSLocalizedDescriptionKey: msg])
-        }
-        // O_NOFOLLOW: a symbolic link, which could point anywhere, is refused rather than followed.
+    private static func fail(_ msg: String) -> Error {
+        NSError(domain: "LocalFlow", code: 3, userInfo: [NSLocalizedDescriptionKey: msg])
+    }
+
+    /// Opens the pinned file for reading. O_NOFOLLOW: a symbolic link, which could point anywhere, is refused
+    /// rather than followed. The caller owns the descriptor.
+    private static func openChecked(_ path: String, _ info: ModelInfo) throws -> Int32 {
         let fd = open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
         guard fd >= 0 else { throw fail(errno == ELOOP ? "not a regular file" : "cannot open (errno \(errno))") }
-        defer { close(fd) }
         var st = stat()
-        guard fstat(fd, &st) == 0, (st.st_mode & S_IFMT) == S_IFREG else { throw fail("not a regular file") }
-        guard Int(st.st_size) == info.bytes else { throw fail("file size \(st.st_size) does not match expected \(info.bytes)") }
+        guard fstat(fd, &st) == 0, (st.st_mode & S_IFMT) == S_IFREG else { close(fd); throw fail("not a regular file") }
+        guard Int(st.st_size) == info.bytes else {
+            close(fd)
+            throw fail("file size \(st.st_size) does not match expected \(info.bytes)")
+        }
+        return fd
+    }
+
+    /// Header and SHA-256 of an open file, read through the descriptor.
+    private static func hashCheck(_ fd: Int32, _ info: ModelInfo) throws {
+        let chunk = 8 << 20
+        let buf = UnsafeMutableRawPointer.allocate(byteCount: chunk, alignment: 64)
+        defer { buf.deallocate() }
+        var hasher = SHA256()
+        var total = 0
+        while true {
+            let n = read(fd, buf, chunk)
+            if n < 0, errno == EINTR { continue }
+            guard n > 0 else { break }
+            let part = UnsafeRawBufferPointer(start: buf, count: n)
+            if total == 0 {
+                let magic = String(decoding: part.prefix(4), as: UTF8.self)
+                guard magic == "lmgg" || magic == "GGUF" else { throw fail("not a model file") }
+            }
+            hasher.update(bufferPointer: part)
+            total += n
+        }
+        guard total == info.bytes else { throw fail("file changed while it was being read") }
+        let digest = hasher.finalize().map { String(format: "%02x", $0) }.joined()
+        guard digest == info.sha256 else { throw fail("checksum mismatch") }
+    }
+
+    private static func readAndCheck(_ path: String, _ info: ModelInfo) throws -> VerifiedModel {
+        let fd = try openChecked(path, info)
+        defer { close(fd) }
 
         let model = VerifiedModel(count: info.bytes)
         var done = 0

@@ -29,17 +29,14 @@ final class Polisher {
          "Καλημέρα, μπορείς να μου στείλεις το τιμολόγιο μέχρι αύριο;"),
     ]
 
-    init?(model verified: VerifiedModel) {
+    /// `file` is the model file opened and checked by ModelManager.openVerified; it's closed here.
+    init?(file: UnsafeMutablePointer<FILE>) {
         llama_log_set({ _, _, _ in }, nil)
         llama_backend_init()
         var mp = llama_model_default_params()
         mp.n_gpu_layers = 99
-        // Read the checked bytes through a memory-backed FILE, not the file on disk (so no mmap of it either).
-        mp.load_mode = LLAMA_LOAD_MODE_NONE
-        mp.lazy_mode = LLAMA_LAZY_MODE_OFF
-        guard let f = fmemopen(verified.bytes, verified.count, "rb") else { return nil }
-        let loaded = llama_model_load_from_file_ptr(f, mp)
-        fclose(f)
+        let loaded = llama_model_load_from_file_ptr(file, mp)
+        fclose(file)
         guard let m = loaded else { return nil }
         model = m
         var cp = llama_context_default_params()
@@ -161,9 +158,9 @@ enum PolisherLoader {
             Log.info("polish: no model file found")
             return nil
         }
-        guard let model = ModelManager.readVerified(path, ModelInfo.polish) else { return nil }
+        guard let file = ModelManager.openVerified(path, ModelInfo.polish) else { return nil }
         let t0 = Date()
-        let p = Polisher(model: model)
+        let p = Polisher(file: file)
         Log.info("polish: \(p == nil ? "FAILED" : "loaded") \(path) in \(Int(Date().timeIntervalSince(t0) * 1000)) ms")
         return p
     }
