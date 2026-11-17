@@ -11,10 +11,10 @@ final class ParakeetEngine: SpeechEngine {
     let kind: Engine = .parakeet
     private var ctx: OpaquePointer?
 
-    init?(modelPath: String) {
+    init?(model: VerifiedModel) {
         var params = parakeet_context_default_params()
         params.use_gpu = true
-        guard let c = parakeet_init_from_file_with_params(modelPath, params) else { return nil }
+        guard let c = parakeet_init_from_buffer_with_params(model.bytes, model.count, params) else { return nil }
         ctx = c
     }
 
@@ -46,11 +46,11 @@ final class WhisperEngine: SpeechEngine {
     let kind: Engine = .whisper
     private var ctx: OpaquePointer?
 
-    init?(modelPath: String) {
+    init?(model: VerifiedModel) {
         var params = whisper_context_default_params()
         params.use_gpu = true
         params.flash_attn = true
-        guard let c = whisper_init_from_file_with_params(modelPath, params) else { return nil }
+        guard let c = whisper_init_from_buffer_with_params(model.bytes, model.count, params) else { return nil }
         ctx = c
     }
 
@@ -134,12 +134,13 @@ enum EngineLoader {
             Log.info("engine: no model file for \(engine.rawValue) in \(Settings.modelsDir.path)")
             return nil
         }
-        guard ModelManager.verifyBeforeLoad(path, ModelInfo.info(for: engine)) else { return nil }
+        // Loaded from the checked bytes in memory, not from the file.
+        guard let model = ModelManager.readVerified(path, ModelInfo.info(for: engine)) else { return nil }
         let t0 = Date()
         let result: SpeechEngine?
         switch engine {
-        case .parakeet: result = ParakeetEngine(modelPath: path)
-        case .whisper: result = WhisperEngine(modelPath: path)
+        case .parakeet: result = ParakeetEngine(model: model)
+        case .whisper: result = WhisperEngine(model: model)
         }
         let ms = Int(Date().timeIntervalSince(t0) * 1000)
         Log.info("engine: \(engine.rawValue) \(result == nil ? "FAILED" : "loaded") from \(path) in \(ms) ms")

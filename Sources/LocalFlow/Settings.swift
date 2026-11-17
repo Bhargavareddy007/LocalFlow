@@ -149,8 +149,8 @@ final class Settings {
     /// The engine's model: only the pinned file name. Other files in the folder are never loaded.
     func modelPath(for engine: Engine) -> String? { pinnedPath(ModelInfo.info(for: engine)) }
 
-    /// The pinned file in the user's models folder or bundled inside the app. Its size and SHA-256 are
-    /// checked again just before it's loaded (ModelManager.verifyBeforeLoad).
+    /// The pinned file in the user's models folder or bundled inside the app. It's read into memory and
+    /// checked against its pinned size and SHA-256, and the engine loads those bytes (ModelManager.readVerified).
     private func pinnedPath(_ info: ModelInfo) -> String? {
         var dirs = [Settings.modelsDir]
         if let res = Bundle.main.resourceURL { dirs.append(res.appendingPathComponent("models")) }

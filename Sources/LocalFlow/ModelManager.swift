@@ -32,6 +32,20 @@ struct ModelInfo {
     static func info(for engine: Engine) -> ModelInfo { engine == .parakeet ? parakeet : whisper }
 }
 
+/// A model file's bytes in memory, checked against the pinned size and SHA-256 (ModelManager.readVerified).
+/// Engines copy what they need while loading; the memory is released when this goes away.
+final class VerifiedModel {
+    let bytes: UnsafeMutableRawPointer
+    let count: Int
+
+    init(count: Int) {
+        self.count = count
+        bytes = UnsafeMutableRawPointer.allocate(byteCount: count, alignment: 64)
+    }
+
+    deinit { bytes.deallocate() }
+}
+
 /// Downloads model files into the models folder. This is the only network access the app ever makes,
 /// and only when a model is missing.
 final class ModelManager: NSObject, URLSessionDownloadDelegate {
@@ -94,27 +108,53 @@ final class ModelManager: NSObject, URLSessionDownloadDelegate {
         guard digest == info.sha256 else { throw fail("checksum mismatch") }
     }
 
-    /// Size, header and SHA-256 again, just before a model is loaded: the folder is writable by any process
-    /// of the user, and the model parsers are C/C++ code. A file that fails is renamed to `.rejected`,
-    /// so the app downloads a fresh copy instead of loading it.
-    static func verifyBeforeLoad(_ path: String, _ info: ModelInfo) -> Bool {
+    /// Reads a model file into memory once and checks those bytes (size, header, SHA-256). The engines load
+    /// from the returned bytes, never from the file, so nothing on disk can change between the check and the
+    /// load: the folder is writable by any process of the user, and the model parsers are C/C++ code.
+    /// A file that fails is renamed to `.rejected`, so the app downloads a fresh copy instead of loading it.
+    static func readVerified(_ path: String, _ info: ModelInfo) -> VerifiedModel? {
         let t0 = Date()
         do {
-            // A plain file only: a symbolic link could point anywhere.
-            let type = (try? FileManager.default.attributesOfItem(atPath: path)[.type] as? FileAttributeType) ?? nil
-            guard type == .typeRegular else {
-                throw NSError(domain: "LocalFlow", code: 3, userInfo: [NSLocalizedDescriptionKey: "not a regular file"])
-            }
-            try validate(file: URL(fileURLWithPath: path), response: nil, against: info)
-            Log.info("model: \(info.fileName) verified in \(Int(Date().timeIntervalSince(t0) * 1000)) ms")
-            return true
+            let model = try readAndCheck(path, info)
+            Log.info("model: \(info.fileName) read and verified in \(Int(Date().timeIntervalSince(t0) * 1000)) ms")
+            return model
         } catch {
             Log.info("model: \(path) failed verification (\(error.localizedDescription)); not loaded")
             let rejected = path + ".rejected"
             try? FileManager.default.removeItem(atPath: rejected)
             try? FileManager.default.moveItem(atPath: path, toPath: rejected)
-            return false
+            return nil
         }
+    }
+
+    private static func readAndCheck(_ path: String, _ info: ModelInfo) throws -> VerifiedModel {
+        func fail(_ msg: String) -> Error {
+            NSError(domain: "LocalFlow", code: 3, userInfo: [NSLocalizedDescriptionKey: msg])
+        }
+        // O_NOFOLLOW: a symbolic link, which could point anywhere, is refused rather than followed.
+        let fd = open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
+        guard fd >= 0 else { throw fail(errno == ELOOP ? "not a regular file" : "cannot open (errno \(errno))") }
+        defer { close(fd) }
+        var st = stat()
+        guard fstat(fd, &st) == 0, (st.st_mode & S_IFMT) == S_IFREG else { throw fail("not a regular file") }
+        guard Int(st.st_size) == info.bytes else { throw fail("file size \(st.st_size) does not match expected \(info.bytes)") }
+
+        let model = VerifiedModel(count: info.bytes)
+        var done = 0
+        while done < info.bytes {
+            let n = read(fd, model.bytes + done, min(info.bytes - done, 64 << 20))
+            if n < 0, errno == EINTR { continue }
+            guard n > 0 else { break }
+            done += n
+        }
+        var extra: UInt8 = 0
+        guard done == info.bytes, read(fd, &extra, 1) == 0 else { throw fail("file changed while it was being read") }
+        let all = UnsafeRawBufferPointer(start: model.bytes, count: info.bytes)
+        let magic = String(decoding: all.prefix(4), as: UTF8.self)
+        guard magic == "lmgg" || magic == "GGUF" else { throw fail("not a model file") }
+        let digest = SHA256.hash(data: all).map { String(format: "%02x", $0) }.joined()
+        guard digest == info.sha256 else { throw fail("checksum mismatch") }
+        return model
     }
 
     /// Hugging Face answers with a redirect to its CDN (us.aws.cdn.hf.co at the time of writing): follow it
