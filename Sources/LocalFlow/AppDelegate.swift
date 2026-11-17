@@ -56,10 +56,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // No dictation record outlives a session: delete the pre-0.2.0 history file, and if dictated text
         // was being logged for troubleshooting when the app last quit, switch that off and wipe the log.
         History.deleteLegacyFile()
-        if Settings.shared.verboseLog {
-            Settings.shared.verboseLog = false
-            Log.clear()
-        }
+        // 0.2.1 kept the text-logging switch in the preferences; it's memory-only now.
+        if UserDefaults.standard.bool(forKey: "verboseLog") { Log.clear() }
+        UserDefaults.standard.removeObject(forKey: "verboseLog")
         Log.info("LocalFlow starting (pid \(ProcessInfo.processInfo.processIdentifier))")
         PersonalDictionary.ensureFileExists()
         PersonalDictionary.reload()
@@ -199,7 +198,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let name: String
         var tint: NSColor? = nil
         switch state {
-        case .idle: name = engineReady ? "waveform" : "waveform.slash"
+        case .idle:
+            name = engineReady ? "waveform" : "waveform.slash"
+            if Settings.shared.verboseLog { tint = .systemOrange }  // dictated text is being logged
         case .recording: name = "waveform.circle.fill"; tint = .systemRed
         case .transcribing: name = "ellipsis.circle.fill"; tint = .systemBlue
         }
@@ -364,6 +365,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func toggleVerboseLog() {
         Settings.shared.verboseLog.toggle()
         if !Settings.shared.verboseLog { Log.clear() }
+        updateIcon()
     }
 
     @objc private func toggleLaunchAtLogin() {
@@ -447,8 +449,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 self.engineReady = loaded != nil
                 self.engineLoading = false
                 self.updateIcon()
-                if loaded == nil {
-                    self.flash("No \(kind.rawValue) model found in models folder", seconds: 3)
+                if loaded == nil, Settings.shared.modelPath(for: kind) == nil {
+                    // Missing, or it failed the check before loading and was set aside.
+                    self.flash("The \(kind.rawValue) model needs downloading again", seconds: 3)
+                    ModelManager.shared.download(kind)
+                    self.showSetup()
+                } else if loaded == nil {
+                    self.flash("The \(kind.rawValue) model could not be loaded", seconds: 3)
                 }
                 if !self.polisherReady { self.loadPolisher() }
             }
@@ -572,7 +579,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         updateIcon()
     }
 
-    /// Troubleshooting only (Settings.saveRecordings): keeps the last 30 recordings as WAV files.
+    /// Debug builds only (Settings.saveRecordings): keeps the last 30 recordings as WAV files.
     private func saveRecording(_ samples: [Float]) {
         DispatchQueue.global(qos: .utility).async {
             let fm = FileManager.default
@@ -608,7 +615,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         let level = AudioRecorder.levels(samples)
-        if Settings.shared.saveRecordings { saveRecording(samples) }
         let levelNote = String(format: " (peak %.0f dB, rms %.0f dB, speech %.0f dB)", level.peak, level.rms, level.speech)
 
         guard level.speech >= AudioRecorder.minSpeechLevel else {
@@ -667,6 +673,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     self.flash("Password field — nothing was typed", seconds: 2.5)
                     return
                 }
+                if Settings.shared.saveRecordings { self.saveRecording(samples) }  // debug builds only
                 // Read the switch now, not when recording stopped: if it was turned off (and the log wiped)
                 // while this dictation was processing, its text must not be written back.
                 let detail = Settings.shared.verboseLog ? ": \(text) [raw: \(raw)]" : " (\(text.count) chars)"

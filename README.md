@@ -24,19 +24,19 @@ Requirements: a Mac with an Apple chip (M1 or newer), macOS 26 (Tahoe) or newer,
 
 ## Features
 
-<img src="docs/menu.png" width="400" align="right" alt="The LocalFlow menu: dictation key, engine, language, polish wording, filler-word removal, smart spacing, hands-free mode, sounds, recent dictations, setup and permissions">
+<img src="docs/menu.png" width="400" align="right" alt="The LocalFlow menu: dictation key, engine, language, polish wording, filler-word removal, smart spacing, hands-free mode, sounds, last dictation, setup and permissions">
 
 - Hold fn to dictate; double-tap fn for hands-free mode, tap once to finish. Other keys selectable in the menu.
 - Two local engines. **Parakeet** is the default: very fast, and it handles English and 24 European languages (Greek, German, French, Spanish, and more) without you picking one. **Whisper large-v3-turbo** covers about 100 languages for everything Parakeet doesn't, including Chinese, Hindi, Arabic, Japanese, Korean and Turkish.
 - Optional **polish wording**: a small local language model (1.1 GB download) that fixes grammar and removes stumbles before typing. Off until you enable it in the menu.
 - Filler-word removal, "new line" / "new paragraph" commands, a personal dictionary for names it mishears, smart spacing, clipboard preserved.
-- Floating waveform while you speak, menu bar icon, recent dictations in the menu (click to copy), launch at login.
+- Floating waveform while you speak, menu bar icon, your last dictation in the menu for 2 minutes (click to copy), launch at login.
 
 <br clear="right">
 
 ## Privacy
 
-Everything stays on the machine. The only network requests the app ever makes are the one-time model downloads from Hugging Face, pinned to an exact file version and verified against a pinned checksum. To type into other apps, LocalFlow briefly puts the text on the clipboard and then puts your previous clipboard back; the text is marked local-only and private, so Universal Clipboard and clipboard managers skip it. It never types into password fields. No history is kept: only your last dictation stays in memory for 2 minutes, so you can copy it again from the menu if a paste didn't land, and nothing is written to disk. Text left on the clipboard instead of pasted (because focus moved, or copied from the menu) is cleared after the same 2 minutes, unless you've copied something else since. The log never contains dictated text unless you switch that on for troubleshooting; that switch turns itself off when the app quits and wipes the log when turned off.
+Everything stays on the machine. The only network requests the app ever makes are the one-time model downloads from Hugging Face (huggingface.co, which redirects to its CDN on a *.hf.co host), pinned to an exact file version and verified against a pinned checksum. The app only ever loads those three files, and checks each one's checksum again every time it loads it. To type into other apps, LocalFlow briefly puts the text on the clipboard and then puts your previous clipboard back; the text is marked local-only and private, so Universal Clipboard and clipboard managers skip it. It never types into password fields. No history is kept: only your last dictation stays in memory for 2 minutes, so you can copy it again from the menu if a paste didn't land, and nothing is written to disk. Text left on the clipboard instead of pasted (because focus moved, or copied from the menu) is cleared after the same 2 minutes, unless you've copied something else since. The log never contains dictated text unless you switch that on for troubleshooting, in the menu: the menu bar icon turns orange while it's on, it turns itself off when the app quits, and it wipes the log when turned off.
 
 Files live in `~/Library/Application Support/LocalFlow/` (models, personal dictionary) and `~/Library/Logs/LocalFlow.log`.
 
@@ -54,12 +54,12 @@ brew install whisper.cpp llama.cpp
 Engine test without a microphone:
 
 ```
-.build/release/LocalFlow --transcribe clip.wav parakeet
-.build/release/LocalFlow --transcribe clip.wav whisper te
-.build/release/LocalFlow --polish "um so I think we should uh move the meeting"
+"build/LocalFlow.app/Contents/MacOS/LocalFlow" --transcribe clip.wav parakeet
+"build/LocalFlow.app/Contents/MacOS/LocalFlow" --transcribe clip.wav whisper te
+"build/LocalFlow.app/Contents/MacOS/LocalFlow" --polish "um so I think we should uh move the meeting"
 ```
 
-Toggle hands-free dictation from scripts, Raycast or Keyboard Maestro: `kill -USR1 $(pgrep -x LocalFlow)`.
+Debug builds (`swift build`) also honour two troubleshooting preferences that release builds ignore: `saveRecordings` (keeps the last 30 recordings as WAV files) and `signalToggle` (`kill -USR1` toggles hands-free dictation).
 
 ## How it works
 

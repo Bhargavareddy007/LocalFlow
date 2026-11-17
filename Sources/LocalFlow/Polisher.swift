@@ -152,9 +152,10 @@ final class Polisher {
 enum PolisherLoader {
     static func load() -> Polisher? {
         guard let path = Settings.shared.polishModelPath() else {
-            Log.info("polish: no .gguf model found")
+            Log.info("polish: no model file found")
             return nil
         }
+        guard ModelManager.verifyBeforeLoad(path, ModelInfo.polish) else { return nil }
         let t0 = Date()
         let p = Polisher(modelPath: path)
         Log.info("polish: \(p == nil ? "FAILED" : "loaded") \(path) in \(Int(Date().timeIntervalSince(t0) * 1000)) ms")

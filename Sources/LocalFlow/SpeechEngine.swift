@@ -107,13 +107,17 @@ enum EngineLoader {
 
     private static var backendsLoaded = false
 
-    /// Homebrew's ggml ships Metal / CPU / BLAS as plug-ins; load them once.
+    /// ggml ships Metal / CPU / BLAS as plug-ins; load them once, from the app bundle only. Release builds
+    /// never look in folders the user can write to (main.swift also clears GGML_BACKEND_PATH).
     static func loadBackends() {
         if backendsLoaded { return }
         backendsLoaded = true
         var dirs: [String] = []
         if let fw = Bundle.main.privateFrameworksPath { dirs.append(fw) }
+        #if DEBUG
+        // `swift run` without a bundle: use Homebrew's plug-ins.
         dirs += ["/opt/homebrew/opt/ggml/libexec", "/opt/homebrew/lib/ggml"]
+        #endif
         for dir in dirs where FileManager.default.fileExists(atPath: dir) {
             ggml_backend_load_all_from_path(dir)
             if ggml_backend_dev_count() > 0 {
@@ -121,8 +125,7 @@ enum EngineLoader {
                 return
             }
         }
-        ggml_backend_load_all()
-        Log.info("ggml: \(ggml_backend_dev_count()) backend device(s) (default search)")
+        Log.info("ggml: no backend found in the app bundle")
     }
 
     static func load(_ engine: Engine) -> SpeechEngine? {
@@ -131,6 +134,7 @@ enum EngineLoader {
             Log.info("engine: no model file for \(engine.rawValue) in \(Settings.modelsDir.path)")
             return nil
         }
+        guard ModelManager.verifyBeforeLoad(path, ModelInfo.info(for: engine)) else { return nil }
         let t0 = Date()
         let result: SpeechEngine?
         switch engine {

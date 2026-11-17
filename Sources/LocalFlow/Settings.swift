@@ -61,8 +61,12 @@ final class Settings {
     private let d = UserDefaults.standard
 
     static let supportDir: URL = {
-        let url = FileManager.default.homeDirectoryForCurrentUser
+        var url = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Application Support/LocalFlow", isDirectory: true)
+        #if DEBUG
+        // Tests run against a scratch folder instead of the real models and dictionary.
+        if let dir = ProcessInfo.processInfo.environment["LOCALFLOW_SUPPORT_DIR"] { url = URL(fileURLWithPath: dir, isDirectory: true) }
+        #endif
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }()
@@ -107,62 +111,52 @@ final class Settings {
     /// Gate for the "polish wording" feature (menu entry + model download).
     /// On by default; hide with: defaults write com.bhargava.localflow polishFeature -bool false
     var polishFeature: Bool { d.object(forKey: "polishFeature") as? Bool ?? true }
+    /// Off until the user turns it on in the menu, even when the polish model is already downloaded.
     var polishEnabled: Bool {
-        get { polishFeature && (d.object(forKey: "polishEnabled") as? Bool ?? true) }
+        get { polishFeature && d.bool(forKey: "polishEnabled") }
         set { d.set(newValue, forKey: "polishEnabled") }
     }
-    /// Off by default: dictated text is never written to the log unless the user turns this on.
-    var verboseLog: Bool {
-        get { d.bool(forKey: "verboseLog") }
-        set { d.set(newValue, forKey: "verboseLog") }
+    /// Writes dictated text to the log. Lives only in memory: it can be switched on from the menu and nowhere
+    /// else, ends when the app quits, and the menu-bar icon turns orange while it's on. Not a preference,
+    /// so another process can't turn it on with `defaults write`.
+    var verboseLog = false
+    /// Troubleshooting switches that other processes could flip with `defaults write`: they exist only in
+    /// debug builds, and release builds ignore them.
+    /// Debug: keeps the last 30 recordings as WAV files in recordingsDir.
+    var saveRecordings: Bool {
+        #if DEBUG
+        return d.bool(forKey: "saveRecordings")
+        #else
+        return false
+        #endif
     }
-    /// Off by default: keeps the last 30 recordings as WAV files in recordingsDir for troubleshooting.
-    /// Turn on with: defaults write com.bhargava.localflow saveRecordings -bool true
-    var saveRecordings: Bool { d.bool(forKey: "saveRecordings") }
-    /// Off by default: `kill -USR1` toggles hands-free dictation (for Raycast / Keyboard Maestro / testing).
-    /// Left off because any local process could use it to turn the mic on.
-    /// Turn on with: defaults write com.bhargava.localflow signalToggle -bool true
-    var signalToggle: Bool { d.bool(forKey: "signalToggle") }
+    /// Debug: `kill -USR1` toggles hands-free dictation (for testing).
+    var signalToggle: Bool {
+        #if DEBUG
+        return d.bool(forKey: "signalToggle")
+        #else
+        return false
+        #endif
+    }
     var tapToLock: Bool {
         get { d.object(forKey: "tapToLock") as? Bool ?? true }
         set { d.set(newValue, forKey: "tapToLock") }
     }
 
-    /// The polishing language model: the default file if present, otherwise the largest .gguf in the models folders.
-    func polishModelPath() -> String? {
-        var dirs = [Settings.modelsDir]
-        if let res = Bundle.main.resourceURL { dirs.append(res.appendingPathComponent("models")) }
-        for dir in dirs {
-            let p = dir.appendingPathComponent(ModelInfo.polish.fileName).path
-            if FileManager.default.fileExists(atPath: p) { return p }
-        }
-        var best: (String, Int)? = nil
-        for dir in dirs {
-            let files = (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
-            for f in files where f.hasSuffix(".gguf") {
-                let path = dir.appendingPathComponent(f).path
-                let size = (try? FileManager.default.attributesOfItem(atPath: path)[.size] as? Int) ?? 0
-                if best == nil || size > best!.1 { best = (path, size) }
-            }
-        }
-        return best?.0
-    }
+    /// The polishing language model: only the pinned file name.
+    func polishModelPath() -> String? { pinnedPath(ModelInfo.polish) }
 
-    /// First model file matching the engine, in the user's models folder or bundled inside the app.
-    func modelPath(for engine: Engine) -> String? {
+    /// The engine's model: only the pinned file name. Other files in the folder are never loaded.
+    func modelPath(for engine: Engine) -> String? { pinnedPath(ModelInfo.info(for: engine)) }
+
+    /// The pinned file in the user's models folder or bundled inside the app. Its size and SHA-256 are
+    /// checked again just before it's loaded (ModelManager.verifyBeforeLoad).
+    private func pinnedPath(_ info: ModelInfo) -> String? {
         var dirs = [Settings.modelsDir]
         if let res = Bundle.main.resourceURL { dirs.append(res.appendingPathComponent("models")) }
         for dir in dirs {
-            let files = (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
-            let candidates = files.filter { $0.hasSuffix(".bin") && !$0.hasSuffix(".part") }.sorted()
-            let match: String?
-            switch engine {
-            case .parakeet:
-                match = candidates.first { $0.contains("parakeet") }
-            case .whisper:
-                match = candidates.first { !$0.contains("parakeet") && !$0.contains("vad") && !$0.contains("silero") }
-            }
-            if let m = match { return dir.appendingPathComponent(m).path }
+            let p = dir.appendingPathComponent(info.fileName).path
+            if FileManager.default.fileExists(atPath: p) { return p }
         }
         return nil
     }

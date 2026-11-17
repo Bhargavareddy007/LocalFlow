@@ -94,6 +94,39 @@ final class ModelManager: NSObject, URLSessionDownloadDelegate {
         guard digest == info.sha256 else { throw fail("checksum mismatch") }
     }
 
+    /// Size, header and SHA-256 again, just before a model is loaded: the folder is writable by any process
+    /// of the user, and the model parsers are C/C++ code. A file that fails is renamed to `.rejected`,
+    /// so the app downloads a fresh copy instead of loading it.
+    static func verifyBeforeLoad(_ path: String, _ info: ModelInfo) -> Bool {
+        let t0 = Date()
+        do {
+            // A plain file only: a symbolic link could point anywhere.
+            let type = (try? FileManager.default.attributesOfItem(atPath: path)[.type] as? FileAttributeType) ?? nil
+            guard type == .typeRegular else {
+                throw NSError(domain: "LocalFlow", code: 3, userInfo: [NSLocalizedDescriptionKey: "not a regular file"])
+            }
+            try validate(file: URL(fileURLWithPath: path), response: nil, against: info)
+            Log.info("model: \(info.fileName) verified in \(Int(Date().timeIntervalSince(t0) * 1000)) ms")
+            return true
+        } catch {
+            Log.info("model: \(path) failed verification (\(error.localizedDescription)); not loaded")
+            let rejected = path + ".rejected"
+            try? FileManager.default.removeItem(atPath: rejected)
+            try? FileManager.default.moveItem(atPath: path, toPath: rejected)
+            return false
+        }
+    }
+
+    /// Hugging Face answers with a redirect to its CDN (us.aws.cdn.hf.co at the time of writing): follow it
+    /// only over HTTPS and only to Hugging Face hosts. The file is checked against the pinned hash either way.
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
+        let host = request.url?.host?.lowercased() ?? ""
+        let allowed = request.url?.scheme == "https" && (host == "huggingface.co" || host.hasSuffix(".hf.co"))
+        if !allowed { Log.info("model: redirect to \(host.isEmpty ? "?" : host) refused") }
+        completionHandler(allowed ? request : nil)
+    }
+
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask,
                     didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
         lock.lock(); let info = active[downloadTask.taskIdentifier]; lock.unlock()

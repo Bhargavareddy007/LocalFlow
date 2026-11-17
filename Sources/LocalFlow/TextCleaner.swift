@@ -59,6 +59,7 @@ enum TextCleaner {
 enum PersonalDictionary {
     private static var cache: [(NSRegularExpression, String)] = []
     private static var loadedAt: Date?
+    private static var lastIgnored = 0
 
     static func ensureFileExists() {
         let url = Settings.dictionaryURL
@@ -75,12 +76,29 @@ enum PersonalDictionary {
         try? sample.data(using: .utf8)?.write(to: url)
     }
 
+    /// Longest spoken or written form accepted, in characters.
+    static let maxLength = 100
+
+    /// A replacement is typed into whatever app has focus, so it must be a plain word or phrase: no line
+    /// breaks, tabs or other control or invisible format characters (a line break could run a command in a
+    /// terminal), and nothing long.
+    static func acceptable(_ s: String) -> Bool {
+        s.count <= maxLength && s.unicodeScalars.allSatisfy { !CharacterSet.controlCharacters.contains($0) }
+    }
+
     static func reload() {
         cache = []
         loadedAt = Date()
         guard let data = try? Data(contentsOf: Settings.dictionaryURL),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let map = json["replacements"] as? [String: String] else { return }
+              let all = json["replacements"] as? [String: String] else { return }
+        // The written form may be empty (to drop a word); the spoken form may not.
+        let map = all.filter { !$0.key.isEmpty && acceptable($0.key) && acceptable($0.value) }
+        let ignored = all.count - map.count
+        if ignored != lastIgnored, ignored > 0 {
+            Log.info("dictionary: ignored \(ignored) replacement(s) with line breaks, control characters or over \(maxLength) characters")
+        }
+        lastIgnored = ignored
         for (spoken, written) in map.sorted(by: { $0.key.count > $1.key.count }) {
             let pattern = "(?i)(?<![\\w])" + NSRegularExpression.escapedPattern(for: spoken) + "(?![\\w])"
             if let re = try? NSRegularExpression(pattern: pattern) {
