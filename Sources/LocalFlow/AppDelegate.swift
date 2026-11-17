@@ -155,6 +155,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func showSetup() { setup.show() }
 
     @objc private func downloadPolishModel() {
+        // "Enable polish wording — download model": the click is the opt-in, so polish is on once it arrives.
+        Settings.shared.polishEnabled = true
         ModelManager.shared.download(model: ModelInfo.polish)
         flash("Downloading polish model (\(ModelInfo.polish.sizeMB) MB)…", seconds: 2.5)
     }
