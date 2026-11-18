@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Local Flow Support</title>
-<meta name="description" content="Help for Local Flow, private offline dictation and keyboard for iPhone.">
+<meta name="description" content="Help for Local Flow: a private keyboard for iPhone with dictation, rewriting, replies and voice messages on the phone.">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -13,15 +13,37 @@
   <img src="icon.png" alt="">
   <h1>Local Flow</h1>
 </header>
-<p class="tagline">Private, offline dictation for iPhone. Your voice never leaves the phone.</p>
+<p class="tagline">A private keyboard for iPhone that types like Apple's and lets you talk instead. Your voice never leaves the phone. · Version 1.3, 18 November 2026</p>
 
 <h2>Set up</h2>
 <ol>
   <li>Open Local Flow once and allow the microphone. From version 1.2 the speech model is inside the app; version 1.0 downloads it once (about 670 MB).</li>
   <li>Add the keyboard: Settings › General › Keyboard › Keyboards › Add New Keyboard › Local Flow.</li>
-  <li>Tap Local Flow in that list and turn on <strong>Allow Full Access</strong>. The keyboard needs it only to receive the text from the app. It contains no networking code.</li>
-  <li>In any app, switch to the Local Flow keyboard with the globe key, tap the mic, speak, and tap the check mark.</li>
+  <li>Tap Local Flow in that list and turn on <strong>Allow Full Access</strong>. The keyboard needs it to receive your dictation from the app, to pass reply and rewrite requests to the app on your iPhone, and for key haptics. It contains no networking code.</li>
+  <li>In any app, switch to the Local Flow keyboard with the globe key. Type, or tap the coral mic key, speak, and tap it again (it shows a check) to insert the text.</li>
 </ol>
+
+<h2>What it does</h2>
+<div class="card">
+  <p><strong>Typing</strong></p>
+  <p>The keys type like Apple's keyboard: a tap lands on the nearest key, letters pop up while you hold them, accents are on a long press, a double space types a full stop, and holding the space bar moves the cursor. Key haptics are in Local Flow › Settings › Keyboard (they need Full Access).</p>
+</div>
+<div class="card">
+  <p><strong>Greek keyboard and the language key</strong></p>
+  <p>Choose your keyboard languages and their order in Local Flow › Settings › Keyboard › Languages (English and Greek for now). With two languages, the EN/ΕΛ key left of the space bar switches between them: tap for the next language, hold it for the list. The space bar shows the language in use, and the keyboard starts in the one you used last. The Greek layout matches Apple's, with the accent key ΄ after π.</p>
+</div>
+<div class="card">
+  <p><strong>✨ Rewrite what you typed</strong></p>
+  <p>Select some text, or leave nothing selected for the whole message, and tap ✨ Polish in the keyboard's top bar. Polish fixes spelling and grammar; Formal, Casual, Very casual and Excited change the tone; Greek ↔ English translates. Check the result on the card and tap Replace; Undo puts your text back. It runs on your iPhone: Polish and the tones need Apple Intelligence (iOS 26), the translations work on every iPhone. Typed text never leaves the phone.</p>
+</div>
+<div class="card">
+  <p><strong>Reply to a message</strong></p>
+  <p>Long-press the message in your chat and tap Copy. In the Local Flow keyboard tap Reply, then the coral Paste button, and say what you want to answer ("yes, Tuesday works, ask her to bring the contract"). Tap the check: Local Flow writes the whole reply in the sender's language. Tap Insert reply to put it in the field, or Another version for different wording; nothing is sent until you tap your app's send button. Nothing to answer? Write a new message instead turns what you say into a complete message.</p>
+</div>
+<div class="card">
+  <p><strong>Read voice messages</strong></p>
+  <p>In WhatsApp, Telegram, Messages, Voice Memos or Files, share a voice message and choose Local Flow. You get the transcript, an English translation of a Greek message (Greek for English, on request) and a short summary of long messages, with Copy and Reply. It is read on your iPhone and the audio is deleted right after.</p>
+</div>
 
 <h2>Questions</h2>
 <div class="card">
@@ -34,7 +56,11 @@
 </div>
 <div class="card">
   <p><strong>Which languages does it understand?</strong></p>
-  <p>English, Greek and 23 more European languages, detected automatically. Translate as you dictate, Greek → English and English → Greek, on the phone. Numbers and times are typed as digits ("7:30 PM"). Writing styles (Formal, Casual and so on) use Apple Intelligence (iOS 26) and need an iPhone 15 Pro or newer.</p>
+  <p>Dictation: English, Greek and 23 more European languages, detected automatically. Translation as you dictate, Greek → English and English → Greek, on the phone. Keyboard layouts: English and Greek. Numbers and times are typed as digits ("7:30 PM"). Writing styles, Polish and replies on the phone use Apple Intelligence (iOS 26) and need an iPhone 15 Pro or newer.</p>
+</div>
+<div class="card">
+  <p><strong>Reply says it needs Apple Intelligence.</strong></p>
+  <p>Replies are written on your iPhone by Apple's on-device model, which needs iOS 26 with Apple Intelligence. Without it, or for languages it does not write, you can turn on Better replies (cloud) in Local Flow › Settings › Voice messages &amp; replies.</p>
 </div>
 <div class="card">
   <p><strong>A name keeps coming out wrong.</strong></p>
@@ -42,7 +68,7 @@
 </div>
 <div class="card">
   <p><strong>Does anything go online?</strong></p>
-  <p>From version 1.2, no: Local Flow never connects to the internet, the speech model comes with the app, and it works the same in airplane mode. Version 1.0 downloads the speech model once from Hugging Face, then works offline. There are no accounts, analytics or servers. See the <a href="privacy.html">privacy policy</a>.</p>
+  <p>Only if you turn on Better replies (cloud), which is off by default and asks you first. Then the message you are answering and what you said, as text, go to our relay and Anthropic's Claude to write the reply; nothing is stored on our server. Everything else (dictation, typing, ✨ rewrite, voice messages, translation, replies written on the phone) stays on your iPhone and works in airplane mode. Versions 1.1 and 1.2 never connected to the internet; version 1.0 downloaded the speech model once from Hugging Face. There are no accounts or analytics. See the <a href="privacy.html">privacy policy</a>.</p>
 </div>
 
 <h2>Contact</h2>

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Local Flow Privacy Policy</title>
-<meta name="description" content="Local Flow collects no data. Audio and text stay on your iPhone.">
+<meta name="description" content="Local Flow works on your iPhone. Audio never leaves the phone; the optional Better replies sends reply text to the cloud only if you turn it on.">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -13,29 +13,55 @@
   <img src="icon.png" alt="">
   <h1>Privacy Policy</h1>
 </header>
-<p class="tagline">Local Flow for iPhone · Last updated 16 November 2026</p>
+<p class="tagline">Local Flow for iPhone · Last updated 18 November 2026 (version 1.3)</p>
 
-<p>Local Flow is a dictation app and keyboard for iPhone. It runs entirely on your device.</p>
+<p>Local Flow is a keyboard and dictation app for iPhone. Everything runs on your device, with one exception that you have to turn on yourself: <strong>Better replies (cloud)</strong>, described below.</p>
 
 <h2>What we collect</h2>
-<p>Nothing. Local Flow has no accounts, no analytics, no advertising, no crash reporting of its own and no servers. We do not receive, store or process any of your data.</p>
+<p>Nothing, unless you turn on Better replies (cloud). Local Flow has no accounts, no analytics, no advertising and no crash reporting of its own. With Better replies off (the default) we do not receive, store or process any of your data. With it on, the text of each reply request passes through our relay server to Anthropic to write the reply, as described under <a href="#cloud">Better replies (cloud)</a>; we do not store it.</p>
 
 <h2>Audio and text</h2>
 <ul>
   <li>Audio from the microphone is transcribed by a speech model running on your iPhone (NVIDIA Parakeet via whisper.cpp). Audio never leaves the phone and is never written to disk.</li>
-  <li>The text you dictate is kept only in the app's memory and is forgotten two minutes after you insert, copy or share it. The text reaches the Local Flow keyboard through a private container shared only between the app and its keyboard (an App Group), and is removed as soon as the keyboard has inserted it, or after two minutes at the latest.</li>
-  <li>When you choose a writing style other than "As spoken", the final text is rewritten by Apple's on-device model (Apple Intelligence). This also happens on your iPhone.</li>
-  <li>When you choose "Greek → English" or "English → Greek", the final text is translated by translation models built into the app (OPUS-MT), running on your iPhone. Nothing is sent anywhere for this either.</li>
+  <li>The text you dictate is kept only in the app's memory and is forgotten two minutes after you insert, copy or share it. It reaches the Local Flow keyboard through a private container shared only between the app and its keyboard (an App Group), and is removed as soon as the keyboard has inserted it, or after two minutes at the latest.</li>
+  <li>When you choose a writing style other than "As spoken", the final text is rewritten by Apple's on-device model (Apple Intelligence), on your iPhone.</li>
+  <li>When you choose "Greek → English" or "English → Greek", the text is translated by translation models built into the app (OPUS-MT), on your iPhone.</li>
+  <li><strong>Typing.</strong> The keys type into the app you are using like any keyboard. Local Flow does not record, store or send what you type. Your keyboard languages and settings are stored on your iPhone.</li>
+  <li><strong>✨ Rewrite</strong> (Polish, the tones and the translations of text you typed) always runs on your iPhone, with Apple's on-device model or the built-in translation models. Typed text is never sent anywhere, even with Better replies on. When the app has to do the rewrite, the text sits in the shared container only while the request is in flight and is removed when you tap Replace or ✕, or after two minutes at the latest.</li>
+  <li><strong>Voice messages</strong> you share to Local Flow (from WhatsApp, Telegram, Messages, Voice Memos or Files) are transcribed, translated and summarised on your iPhone. The audio file is kept in the shared container only until it has been decoded (a few seconds), then deleted. The transcript is shown in the share sheet or in the app and kept in memory; it is cleared when you close it (if you tap Reply, the app keeps it in memory for five minutes so the keyboard can answer it).</li>
+  <li><strong>Replies</strong> from the keyboard are written on your iPhone by Apple's on-device model (Greek through the built-in translation), unless you turn on Better replies (cloud).</li>
   <li>While "Listening for the keyboard" is on, the app keeps the microphone open in the background so the keyboard can start a dictation without switching apps, and iOS shows the orange microphone indicator. Until you tap the keyboard's mic key, the audio is discarded as it arrives and nothing is kept or transcribed. You can turn this off, or have it switch off automatically after a period without dictation.</li>
   <li>Words you add to the personal dictionary are stored on your iPhone only.</li>
 </ul>
 
+<h2 id="cloud">Better replies (cloud), off by default</h2>
+<p>If you turn on Settings › Voice messages &amp; replies › Better replies (cloud), Local Flow first shows what it means and asks you to confirm. From then on, each time you ask the keyboard for a reply, Local Flow sends, over an encrypted (HTTPS) connection:</p>
+<ul>
+  <li>the message you are answering and what you said you want to answer, as text (for a new message with "Just write it", only what you said);</li>
+  <li>the message's language, the tone you chose and, when you ask for another version, the previous version;</li>
+  <li>a random token that changes every day, so the relay can apply a daily limit per installation. It cannot be linked from one day to the next.</li>
+</ul>
+<p>They go to Local Flow's relay server (hosted on Railway), which passes them to Anthropic's Claude API to write the reply and sends the reply back to your phone.</p>
+<ul>
+  <li>No audio, no contacts, no account and no device identifier is sent. Text you type in the keyboard, voice messages and dictation are never sent.</li>
+  <li>Our relay stores nothing: no database, no files, and its logs never contain the text (only sizes, timings and error codes).</li>
+  <li>Anthropic processes the text to write the reply. Under its commercial API terms Anthropic does not train models on it and deletes API inputs and outputs within 30 days, except where its automated safety systems flag a request or the law requires otherwise. See <a href="https://www.anthropic.com/legal/privacy">Anthropic's privacy policy</a>.</li>
+  <li>If the relay cannot be reached, the reply is written on your iPhone instead.</li>
+  <li>You can turn Better replies off at any time; nothing is sent while it is off.</li>
+</ul>
+
 <h2>Network use</h2>
-<p>From version 1.2: none. Local Flow never connects to the internet. The speech and translation models are part of the app you download from the App Store, and neither the app nor its keyboard contains any networking code. It works the same in airplane mode.</p>
-<p>Version 1.0 made one network request: a one-time download of the speech model file (about 670 MB) from Hugging Face (huggingface.co), pinned to an exact file version and verified against a checksum. Like any download, it showed your IP address to Hugging Face and contained no other information about you. Updating to 1.2 deletes that downloaded copy.</p>
+<p>From version 1.3: none, unless you turn on Better replies (cloud). The speech and translation models are part of the app you download from the App Store; dictation, typing, rewriting, voice messages, translation and replies written on the phone work the same in airplane mode. The keyboard and the share extension contain no networking code; the app contains one small client that is used only for Better replies.</p>
+<p>Versions 1.1 and 1.2 never connected to the internet.</p>
+<p>Version 1.0 made one network request: a one-time download of the speech model file (about 670 MB) from Hugging Face (huggingface.co), pinned to an exact file version and verified against a checksum. Like any download, it showed your IP address to Hugging Face and contained no other information about you. Updating to 1.2 or later deletes that downloaded copy.</p>
 
 <h2>Full Access</h2>
-<p>iOS asks you to allow "Full Access" for the Local Flow keyboard. Local Flow needs it only so the keyboard can read the text the app hands back through the shared container. The keyboard does not use the network, does not collect what you type and does not store anything.</p>
+<p>iOS asks you to allow "Full Access" for the Local Flow keyboard. Local Flow needs it so the keyboard can use the private container it shares with the app: to receive the text you dictate, to hand a reply request or a rewrite to the app, and for key haptics. With Full Access the keyboard also:</p>
+<ul>
+  <li>reads the text of the field you are typing in only when you tap ✨ to rewrite it (the selection, or the whole message), and only to rewrite it on your iPhone;</li>
+  <li>reads the clipboard only when you tap Paste in the Reply panel. To show the right button it checks only whether something is copied, never what.</li>
+</ul>
+<p>Like any keyboard it sees the few words before the cursor to type correctly (for example a capital letter after a full stop). The keyboard does not use the network, does not collect or store what you type, and never logs text.</p>
 
 <h2>Permissions</h2>
 <ul>
@@ -44,7 +70,7 @@
 </ul>
 
 <h2>Children</h2>
-<p>Local Flow does not collect data from anyone, including children. It is rated 4+.</p>
+<p>Local Flow does not knowingly collect data from anyone, including children. It is rated 4+.</p>
 
 <h2>Changes</h2>
 <p>If this policy changes, the new version is published on this page with the date above.</p>
