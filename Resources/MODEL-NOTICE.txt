@@ -1,0 +1,13 @@
+ggml-parakeet-tdt-0.6b-v3-q8_0.bin
+
+Parakeet TDT 0.6B v3, by NVIDIA
+https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3
+
+Converted to GGML format and quantized to 8 bits by ggml-org
+https://huggingface.co/ggml-org/parakeet-GGUF
+
+Included in LocalFlow unchanged from ggml-org's file
+(SHA-256 4d64e9e96c2792186d072fde0034df0ad670cf680a2f53069052ead827fd600e).
+
+Licensed under the Creative Commons Attribution 4.0 International License (CC BY 4.0)
+https://creativecommons.org/licenses/by/4.0/

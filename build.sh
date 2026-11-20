@@ -121,6 +121,7 @@ bundled_app() {
   cp -R "$APP" build/dmg/
   mkdir -p "$BIG/Contents/Resources/models"
   cp -c "build/models/$file" "$BIG/Contents/Resources/models/"
+  cp Resources/MODEL-NOTICE.txt "$BIG/Contents/Resources/models/NOTICE.txt"   # the model's CC BY 4.0 credit
   sign --entitlements Resources/LocalFlow.entitlements "$BIG"
   codesign --verify --deep --strict "$BIG"
   du -sh "$BIG" | awk '{print "built " $2 " with the speech model (" $1 ")"}'
