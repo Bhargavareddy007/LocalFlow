@@ -40,6 +40,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // MARK: - Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if runningFromDownload() {
+            askToMoveToApplications()
+            return
+        }
         // Two copies (say one in Downloads, one in Applications) would both record and paste every dictation.
         if let id = Bundle.main.bundleIdentifier,
            let other = NSRunningApplication.runningApplications(withBundleIdentifier: id)
@@ -59,10 +63,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // 0.2.1 kept the text-logging switch in the preferences; it's memory-only now.
         if UserDefaults.standard.bool(forKey: "verboseLog") { Log.clear() }
         UserDefaults.standard.removeObject(forKey: "verboseLog")
+        #if !DEBUG
+        // 0.2.1 and earlier could keep recordings of dictations; release builds never save any now.
+        try? FileManager.default.removeItem(at: Settings.supportDir.appendingPathComponent("recordings"))
+        #endif
         Log.info("LocalFlow starting (pid \(ProcessInfo.processInfo.processIdentifier))")
         PersonalDictionary.ensureFileExists()
         PersonalDictionary.reload()
         EngineLoader.quietLogs()
+
+        // A fresh install (no speech model yet) starts at login, so dictation still works after a restart;
+        // the setup window shows this with a checkbox to turn it off. Updates keep what the user chose.
+        let freshInstall = Settings.shared.modelPath(for: .parakeet) == nil && Settings.shared.modelPath(for: .whisper) == nil
+        if freshInstall, !UserDefaults.standard.bool(forKey: "loginItemDefaulted") {
+            do { try SMAppService.mainApp.register() } catch { Log.info("launch at login failed: \(error)") }
+            UserDefaults.standard.set(true, forKey: "loginItemDefaulted")
+        }
 
         setupStatusItem()
         setupHotkeys()
@@ -89,6 +105,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         recorder.onLevel = { [weak self] level in self?.overlay.push(level: level) }
         recorder.onReady = { [weak self] in self?.micBecameReady() }
         if Settings.shared.signalToggle { setupSignalToggle() }
+    }
+
+    /// Opened straight from the disk image, or from Downloads without being moved (macOS then runs it from
+    /// a hidden read-only copy). Permissions and "Launch at login" would belong to a copy that goes away.
+    private func runningFromDownload() -> Bool {
+        let url = Bundle.main.bundleURL
+        let readOnly = (try? url.resourceValues(forKeys: [.volumeIsReadOnlyKey]))?.volumeIsReadOnly ?? false
+        return readOnly || url.path.contains("/AppTranslocation/")
+    }
+
+    private func askToMoveToApplications() {
+        Log.info("running from \(Bundle.main.bundlePath); asked to move to Applications")
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = "Move LocalFlow to Applications first"
+        alert.informativeText = "Drag LocalFlow into your Applications folder, then open it from there."
+        alert.addButton(withTitle: "Open Applications Folder")
+        alert.addButton(withTitle: "Quit")
+        if alert.runModal() == .alertFirstButtonReturn {
+            NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications"))
+        }
+        NSApp.terminate(nil)
     }
 
     /// `kill -USR1 $(pgrep -x LocalFlow)` toggles hands-free dictation — handy for

@@ -15,10 +15,12 @@ Voice typing for macOS that never leaves your Mac. Hold a key, talk, let go: the
 
 ## Install (no Terminal needed)
 
-1. Download `LocalFlow.zip` from the [latest release](../../releases/latest) and unzip it.
-2. Drag **LocalFlow** into Applications and open it. The app is signed and notarized by Apple, so it opens with a double-click.
-3. A setup window downloads the speech model (669 MB, one time) and asks for two permissions: Microphone, and Accessibility (so it can see the hotkey and type into other apps).
+1. Download `LocalFlow.dmg` from the [latest release](../../releases/latest) and open it.
+2. Drag **LocalFlow** onto the Applications folder in the window that appears, then open it from Applications. The app is signed and notarized by Apple, so it opens with a double-click.
+3. A setup window downloads the speech model (669 MB, one time) and asks for two permissions: Microphone, and Accessibility (so it can see the hotkey and type into other apps). LocalFlow starts at login unless you untick that box.
 4. Hold **fn**, talk, release.
+
+`LocalFlow.zip` on the same page has the same app, for anyone who prefers a zip.
 
 Requirements: a Mac with an Apple chip (M1 or newer), macOS 26 (Tahoe) or newer, internet once for the model download.
 
@@ -36,7 +38,7 @@ Requirements: a Mac with an Apple chip (M1 or newer), macOS 26 (Tahoe) or newer,
 
 ## Privacy
 
-Everything stays on the machine. The only network requests the app ever makes are the one-time model downloads from Hugging Face (huggingface.co, which redirects to its CDN on a *.hf.co host), pinned to an exact file version and verified against a pinned checksum. The app only ever loads those three files and checks each one's checksum every time it loads it: the speech models load from the very bytes that were checked, and the optional polish model through the same open file that was checked. To type into other apps, LocalFlow briefly puts the text on the clipboard and then puts your previous clipboard back; the text is marked local-only and private, so Universal Clipboard and clipboard managers skip it. It never types into password fields. No history is kept: only your last dictation stays in memory for 2 minutes, so you can copy it again from the menu if a paste didn't land, and nothing is written to disk. Text left on the clipboard instead of pasted (because focus moved, or copied from the menu) is cleared after the same 2 minutes, unless you've copied something else since. The log never contains dictated text unless you switch that on for troubleshooting, in the menu: the menu bar icon turns orange while it's on, it turns itself off when the app quits, and it wipes the log when turned off.
+Everything stays on the machine. The only network requests the app ever makes are the one-time model downloads from Hugging Face (huggingface.co, which redirects to its CDN on a *.hf.co host), pinned to an exact file version and verified against a pinned checksum. The app only ever loads those three files and checks each one's checksum every time it loads it: the speech models load from the very bytes that were checked, and the optional polish model from a private copy of the file that was checked, which later changes to the file can't reach. Polished text is typed only if it adds no control characters or line breaks. To type into other apps, LocalFlow briefly puts the text on the clipboard and then puts your previous clipboard back; the text is marked local-only and private, so Universal Clipboard and clipboard managers skip it. It never types into password fields. No history is kept: only your last dictation stays in memory for 2 minutes, so you can copy it again from the menu if a paste didn't land, and nothing is written to disk. Text left on the clipboard instead of pasted (because focus moved, or copied from the menu) is cleared after the same 2 minutes, unless you've copied something else since. The log never contains dictated text unless you switch that on for troubleshooting, in the menu: the menu bar icon turns orange while it's on, it turns itself off when the app quits, and it wipes the log when turned off.
 
 Files live in `~/Library/Application Support/LocalFlow/` (models, personal dictionary) and `~/Library/Logs/LocalFlow.log`.
 

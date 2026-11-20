@@ -118,12 +118,15 @@ final class ModelManager: NSObject, URLSessionDownloadDelegate {
     }
 
     /// The polish model takes a different route, because a 1.1 GB copy in memory would stay in the app's
-    /// footprint for as long as the model is loaded: the file is opened once, hashed through that descriptor,
-    /// and the same open file goes to the loader, which maps it. Renaming or replacing the file has no effect
-    /// once it's open; a process of the same user could still change the opened file in place while it loads.
+    /// footprint for as long as the model is loaded. The loader maps the file it's given, and a mapping sees
+    /// later writes to that file, so it never gets the pinned file itself: it gets a private APFS clone
+    /// (no extra disk or memory) whose name is deleted as soon as it's opened. Writes to the pinned file
+    /// don't reach the clone. The clone is hashed through that descriptor and the same open file goes to the
+    /// loader. What remains: a process of the same user that opens the clone in the moment between its
+    /// creation and the delete.
     static func openVerified(_ path: String, _ info: ModelInfo) -> UnsafeMutablePointer<FILE>? {
-        checked(path, info, "verified") {
-            let fd = try openChecked(path, info)
+        checked(path, info, "cloned and verified") {
+            let fd = try openPrivateClone(path, info)
             do {
                 try hashCheck(fd, info)
                 guard lseek(fd, 0, SEEK_SET) == 0, let f = fdopen(fd, "rb") else { throw fail("cannot reopen") }
@@ -135,6 +138,37 @@ final class ModelManager: NSObject, URLSessionDownloadDelegate {
         }
     }
 
+    private static let clonePrefix = ".loading-"
+
+    /// Clones the pinned file under a random name in the same folder, opens the clone and deletes its name
+    /// at once. The caller owns the descriptor.
+    private static func openPrivateClone(_ path: String, _ info: ModelInfo) throws -> Int32 {
+        let src = try openChecked(path, info)
+        defer { close(src) }
+        let dir = (path as NSString).deletingLastPathComponent
+        // Left behind only if the app stopped between creating a clone and deleting its name.
+        for name in (try? FileManager.default.contentsOfDirectory(atPath: dir)) ?? [] where name.hasPrefix(clonePrefix) {
+            unlink((dir as NSString).appendingPathComponent(name))
+        }
+        let clone = (dir as NSString).appendingPathComponent(clonePrefix + UUID().uuidString)
+        guard fclonefileat(src, AT_FDCWD, clone, 0) == 0 else { throw notTheFile("cannot clone (errno \(errno))") }
+        let fd = open(clone, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
+        let openErrno = errno
+        unlink(clone)
+        guard fd >= 0 else { throw notTheFile("cannot open the clone (errno \(openErrno))") }
+        var st = stat()
+        // No links left: nothing linked another name to the clone before its own was deleted.
+        guard fstat(fd, &st) == 0, (st.st_mode & S_IFMT) == S_IFREG, st.st_nlink == 0 else {
+            close(fd)
+            throw notTheFile("the clone was linked or replaced before it was opened")
+        }
+        guard Int(st.st_size) == info.bytes else {
+            close(fd)
+            throw fail("file size \(st.st_size) does not match expected \(info.bytes)")
+        }
+        return fd
+    }
+
     /// Runs a check; a file that fails is renamed to `.rejected`, so the app downloads a fresh copy.
     private static func checked<T>(_ path: String, _ info: ModelInfo, _ verb: String, _ body: () throws -> T) -> T? {
         let t0 = Date()
@@ -142,6 +176,9 @@ final class ModelManager: NSObject, URLSessionDownloadDelegate {
             let result = try body()
             Log.info("model: \(info.fileName) \(verb) in \(Int(Date().timeIntervalSince(t0) * 1000)) ms")
             return result
+        } catch let error as NSError where error.code == notTheFileCode {
+            Log.info("model: \(path) not loaded (\(error.localizedDescription))")
+            return nil
         } catch {
             Log.info("model: \(path) failed verification (\(error.localizedDescription)); not loaded")
             let rejected = path + ".rejected"
@@ -153,6 +190,12 @@ final class ModelManager: NSObject, URLSessionDownloadDelegate {
 
     private static func fail(_ msg: String) -> Error {
         NSError(domain: "LocalFlow", code: 3, userInfo: [NSLocalizedDescriptionKey: msg])
+    }
+
+    /// A failure that says nothing about the pinned file, so it isn't rejected (and downloaded again).
+    private static let notTheFileCode = 4
+    private static func notTheFile(_ msg: String) -> Error {
+        NSError(domain: "LocalFlow", code: notTheFileCode, userInfo: [NSLocalizedDescriptionKey: msg])
     }
 
     /// Opens the pinned file for reading. O_NOFOLLOW: a symbolic link, which could point anywhere, is refused

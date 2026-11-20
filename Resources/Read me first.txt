@@ -8,6 +8,7 @@ INSTALL
 2. A setup window appears. It downloads the speech model (one time) and asks for two permissions:
    - Microphone: click Allow.
    - Accessibility: click "Open System Settings", turn on LocalFlow in the list, come back.
+   LocalFlow starts at login so it's always ready; untick "Start LocalFlow when I log in" there if you'd rather not.
 3. When the window says "All set", hold the fn key, talk, and let go. The text appears where your cursor is.
 
 TIPS

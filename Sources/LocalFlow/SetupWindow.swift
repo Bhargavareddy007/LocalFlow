@@ -1,5 +1,6 @@
 import AppKit
 import AVFoundation
+import ServiceManagement
 
 /// First-run window: model download, microphone, accessibility. Reopened from the menu any time.
 final class SetupWindowController: NSWindowController {
@@ -10,6 +11,7 @@ final class SetupWindowController: NSWindowController {
     private let micButton = NSButton(title: "Allow", target: nil, action: nil)
     private let axStatus = NSTextField(labelWithString: "")
     private let axButton = NSButton(title: "Open System Settings", target: nil, action: nil)
+    private let loginBox = NSButton(checkboxWithTitle: "Start LocalFlow when I log in", target: nil, action: nil)
     private let footer = NSTextField(labelWithString: "")
     private let doneButton = NSButton(title: "Done", target: nil, action: nil)
     private var timer: Timer?
@@ -48,6 +50,7 @@ final class SetupWindowController: NSWindowController {
         micButton.target = self; micButton.action = #selector(micTapped)
         axButton.target = self; axButton.action = #selector(axTapped)
         doneButton.target = self; doneButton.action = #selector(doneTapped)
+        loginBox.target = self; loginBox.action = #selector(loginTapped)
         doneButton.keyEquivalent = "\r"
 
         let modelRow = row("1. Speech model", modelStatus, modelButton)
@@ -63,7 +66,7 @@ final class SetupWindowController: NSWindowController {
         let bottom = NSStackView(views: [footer, NSView(), doneButton])
         bottom.orientation = .horizontal
 
-        let stack = NSStackView(views: [title, subtitle, separator(), modelRow, progress, separator(), micRow, separator(), axRow, axHint, separator(), bottom])
+        let stack = NSStackView(views: [title, subtitle, separator(), modelRow, progress, separator(), micRow, separator(), axRow, axHint, separator(), loginBox, bottom])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 10
@@ -146,6 +149,8 @@ final class SetupWindowController: NSWindowController {
         } else {
             axStatus.stringValue = "Not yet enabled"; axButton.isHidden = false
         }
+        // Login item
+        loginBox.state = SMAppService.mainApp.status == .enabled ? .on : .off
         let allDone = modelReady() && AVCaptureDevice.authorizationStatus(for: .audio) == .authorized && AXIsProcessTrusted()
         footer.stringValue = allDone ? "All set. Hold fn and speak, release to type." : "Finish the steps above."
         footer.textColor = allDone ? .systemGreen : .secondaryLabelColor
@@ -165,6 +170,17 @@ final class SetupWindowController: NSWindowController {
         let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
         _ = AXIsProcessTrustedWithOptions(opts)
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+    }
+
+    @objc private func loginTapped() {
+        do {
+            if loginBox.state == .on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
+        } catch {
+            Log.info("launch at login failed: \(error)")
+        }
+        // Turned off earlier in System Settings › General › Login Items: only the user can turn it back on there.
+        if loginBox.state == .on, SMAppService.mainApp.status == .requiresApproval { SMAppService.openSystemSettingsLoginItems() }
+        refresh()
     }
 
     @objc private func doneTapped() {

@@ -36,6 +36,19 @@ enum TextCleaner {
         return capitalizeSentences(text)
     }
 
+    /// Characters that don't belong in typed words: control and invisible format characters (Unicode Cc
+    /// and Cf) and every kind of line break, including U+2028, U+2029 and NEL, which many editors show as
+    /// a new line.
+    static let unsafeCharacters = CharacterSet.controlCharacters.union(.newlines)
+
+    /// A rewrite of `original` is typed as it is, so it may not bring in anything the dictation didn't
+    /// have: no unsafe characters except plain line breaks, and no more of those than the original.
+    static func safeRewrite(_ rewrite: String, of original: String) -> Bool {
+        func lineBreaks(_ s: String) -> Int { s.unicodeScalars.filter { $0 == "\n" }.count }
+        return rewrite.unicodeScalars.allSatisfy { $0 == "\n" || !unsafeCharacters.contains($0) }
+            && lineBreaks(rewrite) <= lineBreaks(original)
+    }
+
     private static func capitalizeSentences(_ s: String) -> String {
         guard !s.isEmpty else { return s }
         var out = ""
@@ -83,7 +96,7 @@ enum PersonalDictionary {
     /// breaks, tabs or other control or invisible format characters (a line break could run a command in a
     /// terminal), and nothing long.
     static func acceptable(_ s: String) -> Bool {
-        s.count <= maxLength && s.unicodeScalars.allSatisfy { !CharacterSet.controlCharacters.contains($0) }
+        s.count <= maxLength && s.unicodeScalars.allSatisfy { !TextCleaner.unsafeCharacters.contains($0) }
     }
 
     static func reload() {

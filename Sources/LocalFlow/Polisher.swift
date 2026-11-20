@@ -120,6 +120,8 @@ final class Polisher {
         // Plausibility: the rewrite should be roughly the same size as the input.
         let ratio = Double(out.count) / Double(max(text.count, 1))
         guard ratio > 0.35, ratio < 1.8 || out.count < text.count + 20 else { return nil }
+        // Model output goes straight to the paste: no control characters or added line breaks.
+        guard TextCleaner.safeRewrite(out, of: text) else { return nil }
         return out
     }
 
