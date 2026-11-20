@@ -76,9 +76,13 @@ sign() {
 # Submits a file to Apple's notarization service and staples the ticket to it; exits on rejection.
 notarize() {
   local log="build/notarize-$(basename "$1").log"
-  echo "submitting $(basename "$1") to Apple notarization service..."
-  # `|| true`: a failed submission must reach the error report below instead of exiting silently.
-  xcrun notarytool submit "$2" --keychain-profile LocalFlow --wait 2>&1 | tee "$log" | grep -E "id:|status:" | tail -3 || true
+  # A large upload can time out; a submission that got no verdict is sent again, up to three times.
+  for attempt in 1 2 3; do
+    echo "submitting $(basename "$1") to Apple notarization service (attempt $attempt)..."
+    # `|| true`: a failed submission must reach the error report below instead of exiting silently.
+    xcrun notarytool submit "$2" --keychain-profile LocalFlow --wait 2>&1 | tee "$log" | grep -E "id:|status:" | tail -3 || true
+    grep -q "status:" "$log" && break
+  done
   if ! grep -q "status: Accepted" "$log"; then
     echo "notarization was not accepted; see $log"
     grep -E "^Error" "$log" || true
