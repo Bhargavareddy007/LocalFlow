@@ -72,9 +72,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         PersonalDictionary.reload()
         EngineLoader.quietLogs()
 
-        // A fresh install (no speech model yet) starts at login, so dictation still works after a restart;
-        // the setup window shows this with a checkbox to turn it off. Updates keep what the user chose.
-        let freshInstall = Settings.shared.modelPath(for: .parakeet) == nil && Settings.shared.modelPath(for: .whisper) == nil
+        // A fresh install (no speech model in the user's folder yet) starts at login, so dictation still works
+        // after a restart; the setup window shows this with a checkbox to turn it off. Updates keep what the
+        // user chose.
+        let freshInstall = ![ModelInfo.parakeet, ModelInfo.whisper].contains {
+            FileManager.default.fileExists(atPath: Settings.modelsDir.appendingPathComponent($0.fileName).path)
+        }
+        ModelManager.installBundled(.parakeet)
         if freshInstall, !UserDefaults.standard.bool(forKey: "loginItemDefaulted") {
             do { try SMAppService.mainApp.register() } catch { Log.info("launch at login failed: \(error)") }
             UserDefaults.standard.set(true, forKey: "loginItemDefaulted")

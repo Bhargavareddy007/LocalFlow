@@ -108,6 +108,29 @@ final class ModelManager: NSObject, URLSessionDownloadDelegate {
         guard digest == info.sha256 else { throw fail("checksum mismatch") }
     }
 
+    /// The app in the disk image carries the default speech model, so a new install has nothing to download.
+    /// It's copied into the models folder (an APFS clone: instant, no extra disk) and from then on treated
+    /// like a downloaded copy: checked before every load, and kept when the app is later updated from the
+    /// small zip, which has no model inside.
+    static func installBundled(_ info: ModelInfo) {
+        let fm = FileManager.default
+        let dest = Settings.modelsDir.appendingPathComponent(info.fileName)
+        guard let res = Bundle.main.resourceURL else { return }
+        let src = res.appendingPathComponent("models").appendingPathComponent(info.fileName)
+        guard fm.fileExists(atPath: src.path), !fm.fileExists(atPath: dest.path) else { return }
+        let partial = dest.appendingPathExtension("partial")
+        do {
+            try? fm.removeItem(at: partial)
+            try fm.copyItem(at: src, to: partial)
+            try fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: partial.path)
+            try fm.moveItem(at: partial, to: dest)
+            Log.info("model: \(info.fileName) copied from the app bundle")
+        } catch {
+            try? fm.removeItem(at: partial)
+            Log.info("model: couldn't copy the bundled \(info.fileName) (\(error.localizedDescription)); it loads from the bundle")
+        }
+    }
+
     /// Reads a model file into memory once and checks those bytes (size, header, SHA-256). The engines load
     /// from the returned bytes, never from the file, so nothing on disk can change between the check and the
     /// load: the folder is writable by any process of the user, and the model parsers are C/C++ code.

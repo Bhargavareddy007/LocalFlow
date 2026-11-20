@@ -5,6 +5,8 @@
 #   ./build.sh zip        build + make ~/Desktop/LocalFlow.zip for sharing
 #   ./build.sh dmg        build + make ~/Desktop/LocalFlow-unnotarized.dmg to check the disk image
 #   ./build.sh notarize   build + notarize with Apple (keychain profile "LocalFlow") + staple + zip and dmg
+# The zip holds the app alone (it downloads the speech model on first launch); the dmg's app carries the
+# default speech model inside, so a new install has nothing to download.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -98,6 +100,31 @@ make_dmg() {
   codesign --force --sign "$IDENTITY" --timestamp "$2"
   ls -la "$2"
 }
+# The disk image's app: the same app plus the default speech model in Contents/Resources/models, re-signed.
+# The model is the file pinned in ModelManager.swift, fetched once into build/models and checked against
+# its pinned SHA-256 every time. Made before the plain app is stapled, so it carries no stale ticket.
+BIG=build/dmg/LocalFlow.app
+bundled_app() {
+  local url sha file
+  url=$(grep -o 'https://huggingface.co/ggml-org/parakeet-GGUF/resolve/[^"]*' Sources/LocalFlow/ModelManager.swift)
+  sha=$(sed -n '/static let parakeet/,/sha256:/p' Sources/LocalFlow/ModelManager.swift | grep -o '[0-9a-f]\{64\}')
+  file=$(basename "$url")
+  mkdir -p build/models
+  if ! echo "$sha  build/models/$file" | shasum -a 256 -c -s 2>/dev/null; then
+    echo "downloading $file..."
+    curl -fL --proto '=https' --proto-redir '=https' -o "build/models/$file.part" "$url"
+    mv "build/models/$file.part" "build/models/$file"
+  fi
+  echo "$sha  build/models/$file" | shasum -a 256 -c -s || { echo "ERROR: $file does not match its pinned SHA-256"; exit 1; }
+  rm -rf build/dmg
+  mkdir -p build/dmg
+  cp -R "$APP" build/dmg/
+  mkdir -p "$BIG/Contents/Resources/models"
+  cp -c "build/models/$file" "$BIG/Contents/Resources/models/"
+  sign --entitlements Resources/LocalFlow.entitlements "$BIG"
+  codesign --verify --deep --strict "$BIG"
+  du -sh "$BIG" | awk '{print "built " $2 " with the speech model (" $1 ")"}'
+}
 for lib in "$FW"/*; do sign "$lib"; done
 sign --entitlements Resources/LocalFlow.entitlements "$APP"
 codesign --verify --deep --strict "$APP"
@@ -112,6 +139,7 @@ case "${1:-}" in
     open /Applications/LocalFlow.app
     echo "installed and launched /Applications/LocalFlow.app" ;;
   notarize)
+    bundled_app
     TMPZIP=$(mktemp -d)/LocalFlow-notarize.zip
     ditto -c -k --sequesterRsrc --keepParent "$APP" "$TMPZIP"
     notarize "$APP" "$TMPZIP"
@@ -123,12 +151,16 @@ case "${1:-}" in
     rm -f ~/Desktop/LocalFlow.zip
     ditto -c -k --sequesterRsrc --keepParent "$STAGE" ~/Desktop/LocalFlow.zip
     ls -la ~/Desktop/LocalFlow.zip
-    make_dmg "$APP" ~/Desktop/LocalFlow.dmg
+    BIGZIP=$(mktemp -d)/LocalFlow-bundled-notarize.zip
+    ditto -c -k --keepParent "$BIG" "$BIGZIP"
+    notarize "$BIG" "$BIGZIP"
+    make_dmg "$BIG" ~/Desktop/LocalFlow.dmg
     notarize ~/Desktop/LocalFlow.dmg ~/Desktop/LocalFlow.dmg
     spctl --assess --type open --context context:primary-signature -vv ~/Desktop/LocalFlow.dmg 2>&1 | head -2 ;;
   dmg)
     # Not notarized, so it gets its own name and never replaces the notarized ~/Desktop/LocalFlow.dmg.
-    make_dmg "$APP" ~/Desktop/LocalFlow-unnotarized.dmg ;;
+    bundled_app
+    make_dmg "$BIG" ~/Desktop/LocalFlow-unnotarized.dmg ;;
   zip)
     # Not notarized, so it gets its own name and never replaces the notarized ~/Desktop/LocalFlow.zip.
     STAGE=$(mktemp -d)/LocalFlow
