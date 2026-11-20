@@ -16,7 +16,7 @@ Voice typing for macOS that never leaves your Mac. Hold a key, talk, let go: the
 ## Install (no Terminal needed)
 
 1. Download `LocalFlow.dmg` from the [latest release](../../releases/latest) and open it.
-2. Drag **LocalFlow** onto the Applications folder in the window that appears, then open it from Applications. The app is signed and notarized by Apple, so it opens with a double-click.
+2. Double-click **LocalFlow** in the window that appears. It copies itself into Applications, ejects the disk image and opens from there. (Dragging it onto Applications works too; then open it from Applications.) The app is signed and notarized by Apple.
 3. A setup window asks for two permissions: Microphone, and Accessibility (so it can see the hotkey and type into other apps). The speech model is already inside the app, so there's nothing else to download. LocalFlow starts at login unless you untick that box.
 4. Hold **fn**, talk, release.
 

@@ -40,14 +40,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // MARK: - Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        if runningFromDownload() {
-            askToMoveToApplications()
+        if Installer.isDownloadCopy(Bundle.main.bundleURL) {
+            Installer.install()
             return
         }
         // Two copies (say one in Downloads, one in Applications) would both record and paste every dictation.
+        // A copy running from the disk image is the installer that just opened this one, and is quitting.
         if let id = Bundle.main.bundleIdentifier,
            let other = NSRunningApplication.runningApplications(withBundleIdentifier: id)
-               .first(where: { $0 != NSRunningApplication.current }) {
+               .first(where: { $0 != NSRunningApplication.current && !Installer.isDownloadCopy($0.bundleURL) }) {
             Log.info("another LocalFlow is already running (pid \(other.processIdentifier)); quitting")
             exit(0)
         }
@@ -106,31 +107,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.showSetup() }
         }
 
+        Installer.ejectInstallerVolume(arguments: CommandLine.arguments)
+
         recorder.onLevel = { [weak self] level in self?.overlay.push(level: level) }
         recorder.onReady = { [weak self] in self?.micBecameReady() }
         if Settings.shared.signalToggle { setupSignalToggle() }
-    }
-
-    /// Opened straight from the disk image, or from Downloads without being moved (macOS then runs it from
-    /// a hidden read-only copy). Permissions and "Launch at login" would belong to a copy that goes away.
-    private func runningFromDownload() -> Bool {
-        let url = Bundle.main.bundleURL
-        let readOnly = (try? url.resourceValues(forKeys: [.volumeIsReadOnlyKey]))?.volumeIsReadOnly ?? false
-        return readOnly || url.path.contains("/AppTranslocation/")
-    }
-
-    private func askToMoveToApplications() {
-        Log.info("running from \(Bundle.main.bundlePath); asked to move to Applications")
-        NSApp.activate(ignoringOtherApps: true)
-        let alert = NSAlert()
-        alert.messageText = "Move LocalFlow to Applications first"
-        alert.informativeText = "Drag LocalFlow into your Applications folder, then open it from there."
-        alert.addButton(withTitle: "Open Applications Folder")
-        alert.addButton(withTitle: "Quit")
-        if alert.runModal() == .alertFirstButtonReturn {
-            NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications"))
-        }
-        NSApp.terminate(nil)
     }
 
     /// `kill -USR1 $(pgrep -x LocalFlow)` toggles hands-free dictation — handy for
@@ -175,6 +156,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         setup.enginePreparing = { [weak self] in self?.engineLoading ?? false }
         setup.downloadFraction = { [weak self] in self?.downloadFractions[ModelInfo.info(for: Settings.shared.engine).fileName] }
         setup.onDownloadRequested = { ModelManager.shared.download(Settings.shared.engine) }
+        setup.hotkeyName = { Settings.shared.hotkey.shortName }
         ModelManager.shared.onProgress = { [weak self] info, f in
             self?.downloadFractions[info.fileName] = f
         }

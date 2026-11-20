@@ -36,7 +36,7 @@ func render(scale: CGFloat, to path: String) {
 
     let para = NSMutableParagraphStyle()
     para.alignment = .center
-    let caption = NSAttributedString(string: "Drag LocalFlow into Applications", attributes: [
+    let caption = NSAttributedString(string: "Double-click LocalFlow to install, or drag it to Applications", attributes: [
         .font: NSFont.systemFont(ofSize: 15, weight: .medium),
         .foregroundColor: NSColor(white: 0.35, alpha: 1),
         .paragraphStyle: para,

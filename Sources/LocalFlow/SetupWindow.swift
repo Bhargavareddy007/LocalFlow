@@ -2,29 +2,31 @@ import AppKit
 import AVFoundation
 import ServiceManagement
 
-/// First-run window: model download, microphone, accessibility. Reopened from the menu any time.
+/// First-run window: speech model, microphone, accessibility, start at login. Reopened from the menu any time.
 final class SetupWindowController: NSWindowController {
-    private let modelStatus = NSTextField(labelWithString: "")
-    private let modelButton = NSButton(title: "Download", target: nil, action: nil)
+    private let modelRow = StepRow(symbol: "waveform", tint: .systemIndigo, title: "Speech model")
+    private let micRow = StepRow(symbol: "mic.fill", tint: .systemOrange, title: "Microphone")
+    private let axRow = StepRow(symbol: "accessibility", tint: .systemBlue, title: "Accessibility")
     private let progress = NSProgressIndicator()
-    private let micStatus = NSTextField(labelWithString: "")
-    private let micButton = NSButton(title: "Allow", target: nil, action: nil)
-    private let axStatus = NSTextField(labelWithString: "")
-    private let axButton = NSButton(title: "Open System Settings", target: nil, action: nil)
     private let loginBox = NSButton(checkboxWithTitle: "Start LocalFlow when I log in", target: nil, action: nil)
-    private let footer = NSTextField(labelWithString: "")
+    private let footer = NSStackView()
     private let doneButton = NSButton(title: "Done", target: nil, action: nil)
     private var timer: Timer?
+    private var wasTrusted = AXIsProcessTrusted()
 
     var onDownloadRequested: (() -> Void)?
     var modelReady: () -> Bool = { false }
     var enginePreparing: () -> Bool = { false }
     var downloadFraction: () -> Double? = { nil }
+    var hotkeyName: () -> String = { "fn" }
 
     init() {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 360),
-                              styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 540, height: 540),
+                              styleMask: [.titled, .closable, .fullSizeContentView], backing: .buffered, defer: false)
         window.title = "LocalFlow Setup"
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.isMovableByWindowBackground = true
         window.isReleasedWhenClosed = false
         super.init(window: window)
         build()
@@ -33,127 +35,143 @@ final class SetupWindowController: NSWindowController {
     required init?(coder: NSCoder) { fatalError() }
 
     private func build() {
-        guard let content = window?.contentView else { return }
+        guard let window = window else { return }
+        let background = NSVisualEffectView()
+        background.material = .underWindowBackground
+        background.blendingMode = .behindWindow
+        background.state = .active
+        window.contentView = background
+
+        let icon = NSImageView(image: NSApp.applicationIconImage)
+        icon.imageScaling = .scaleProportionallyUpOrDown
         let title = NSTextField(labelWithString: "Welcome to LocalFlow")
-        title.font = .systemFont(ofSize: 20, weight: .semibold)
-        let subtitle = NSTextField(wrappingLabelWithString:
-            "Three quick steps, then hold the fn key and talk. Your voice is processed on this Mac only.")
+        title.font = .systemFont(ofSize: 24, weight: .bold)
+        let subtitle = NSTextField(labelWithString: "Voice typing that never leaves this Mac.")
+        subtitle.font = .systemFont(ofSize: 13)
         subtitle.textColor = .secondaryLabelColor
+        let header = NSStackView(views: [icon, title, subtitle])
+        header.orientation = .vertical
+        header.spacing = 6
+        header.setCustomSpacing(14, after: icon)
 
         progress.style = .bar
         progress.isIndeterminate = false
         progress.minValue = 0
         progress.maxValue = 1
         progress.controlSize = .small
+        modelRow.addAccessory(progress)
 
-        modelButton.target = self; modelButton.action = #selector(downloadTapped)
-        micButton.target = self; micButton.action = #selector(micTapped)
-        axButton.target = self; axButton.action = #selector(axTapped)
-        doneButton.target = self; doneButton.action = #selector(doneTapped)
+        modelRow.button.target = self; modelRow.button.action = #selector(downloadTapped)
+        micRow.button.target = self; micRow.button.action = #selector(micTapped)
+        axRow.button.target = self; axRow.button.action = #selector(axTapped)
         loginBox.target = self; loginBox.action = #selector(loginTapped)
+        doneButton.target = self; doneButton.action = #selector(doneTapped)
         doneButton.keyEquivalent = "\r"
+        doneButton.controlSize = .large
 
-        let modelRow = row("1. Speech model", modelStatus, modelButton)
-        let micRow = row("2. Microphone", micStatus, micButton)
-        let axRow = row("3. Accessibility", axStatus, axButton)
-        let axHint = NSTextField(wrappingLabelWithString:
-            "In the list that opens, turn on LocalFlow. This lets the app see the fn key and type into other apps.")
-        axHint.font = .systemFont(ofSize: 11)
-        axHint.textColor = .secondaryLabelColor
+        let card = Card(rows: [modelRow, micRow, axRow])
 
-        footer.font = .systemFont(ofSize: 13, weight: .medium)
-
+        footer.orientation = .horizontal
+        footer.spacing = 6
         let bottom = NSStackView(views: [footer, NSView(), doneButton])
         bottom.orientation = .horizontal
 
-        let stack = NSStackView(views: [title, subtitle, separator(), modelRow, progress, separator(), micRow, separator(), axRow, axHint, separator(), loginBox, bottom])
+        let stack = NSStackView(views: [header, card, loginBox, bottom])
         stack.orientation = .vertical
-        stack.alignment = .leading
-        stack.spacing = 10
-        stack.edgeInsets = NSEdgeInsets(top: 20, left: 24, bottom: 20, right: 24)
+        stack.alignment = .centerX
+        stack.spacing = 18
+        stack.setCustomSpacing(26, after: header)
+        stack.setCustomSpacing(22, after: loginBox)
+        stack.edgeInsets = NSEdgeInsets(top: 44, left: 32, bottom: 26, right: 32)
         stack.translatesAutoresizingMaskIntoConstraints = false
-        content.addSubview(stack)
+        background.addSubview(stack)
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: content.leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: content.trailingAnchor),
-            stack.topAnchor.constraint(equalTo: content.topAnchor),
-            stack.bottomAnchor.constraint(equalTo: content.bottomAnchor),
-            progress.widthAnchor.constraint(equalToConstant: 412),
-            subtitle.widthAnchor.constraint(equalToConstant: 412),
-            axHint.widthAnchor.constraint(equalToConstant: 412),
-            bottom.widthAnchor.constraint(equalToConstant: 412),
+            stack.leadingAnchor.constraint(equalTo: background.leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: background.trailingAnchor),
+            stack.topAnchor.constraint(equalTo: background.topAnchor),
+            stack.bottomAnchor.constraint(equalTo: background.bottomAnchor),
+            icon.widthAnchor.constraint(equalToConstant: 72),
+            icon.heightAnchor.constraint(equalToConstant: 72),
+            card.widthAnchor.constraint(equalToConstant: 476),
+            loginBox.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 4),
+            bottom.widthAnchor.constraint(equalTo: card.widthAnchor),
         ])
-        for r in [modelRow, micRow, axRow] { r.widthAnchor.constraint(equalToConstant: 412).isActive = true }
-    }
-
-    private func row(_ name: String, _ status: NSTextField, _ button: NSButton) -> NSStackView {
-        let label = NSTextField(labelWithString: name)
-        label.font = .systemFont(ofSize: 13, weight: .semibold)
-        label.widthAnchor.constraint(equalToConstant: 130).isActive = true
-        status.textColor = .secondaryLabelColor
-        status.lineBreakMode = .byTruncatingTail
-        let s = NSStackView(views: [label, status, NSView(), button])
-        s.orientation = .horizontal
-        return s
-    }
-
-    private func separator() -> NSBox {
-        let b = NSBox()
-        b.boxType = .separator
-        b.widthAnchor.constraint(equalToConstant: 412).isActive = true
-        return b
     }
 
     func show() {
         refresh()
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.refresh() }
-        window?.center()
+        if let window = window, let content = window.contentView {
+            content.layoutSubtreeIfNeeded()
+            window.setContentSize(content.fittingSize)
+            window.center()
+        }
         NSApp.activate(ignoringOtherApps: true)
         showWindow(nil)
         window?.makeKeyAndOrderFront(nil)
     }
 
     func refresh() {
-        // Model
+        // Speech model
+        progress.isHidden = true
         if modelReady() && enginePreparing() {
-            modelStatus.stringValue = "Preparing engine… (first time takes about 30 s)"
-            modelButton.isHidden = true
-            progress.isHidden = true
+            modelRow.set(detail: "Getting ready… (the first time takes about 30 s)", done: nil)
         } else if modelReady() {
-            modelStatus.stringValue = "Ready ✓"
-            modelButton.isHidden = true
-            progress.isHidden = true
+            modelRow.set(detail: "Runs on this Mac, no internet needed", done: "Ready")
         } else if let f = downloadFraction() {
-            modelStatus.stringValue = "Downloading… \(Int(f * 100))%"
-            modelButton.isHidden = true
+            modelRow.set(detail: "Downloading… \(Int(f * 100))%", done: nil)
             progress.isHidden = false
             progress.doubleValue = f
         } else {
-            modelStatus.stringValue = "Not downloaded (\(ModelInfo.parakeet.sizeMB) MB, one time)"
-            modelButton.isHidden = false
-            progress.isHidden = true
+            modelRow.set(detail: "\(ModelInfo.parakeet.sizeMB) MB, downloaded once", done: nil, button: "Download")
         }
+
         // Microphone
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .authorized:
-            micStatus.stringValue = "Allowed ✓"; micButton.isHidden = true
+            micRow.set(detail: "Listens only while you hold \(hotkeyName())", done: "Allowed")
         case .denied, .restricted:
-            micStatus.stringValue = "Blocked — enable in System Settings"; micButton.title = "Open System Settings"; micButton.isHidden = false
+            micRow.set(detail: "Turned off. Turn on LocalFlow in System Settings", done: nil, button: "Open Settings")
         default:
-            micStatus.stringValue = "Not yet allowed"; micButton.title = "Allow"; micButton.isHidden = false
+            micRow.set(detail: "Listens only while you hold \(hotkeyName())", done: nil, button: "Allow")
         }
+
         // Accessibility
-        if AXIsProcessTrusted() {
-            axStatus.stringValue = "Enabled ✓"; axButton.isHidden = true
+        let trusted = AXIsProcessTrusted()
+        if trusted {
+            axRow.set(detail: "Lets LocalFlow type where your cursor is", done: "On")
         } else {
-            axStatus.stringValue = "Not yet enabled"; axButton.isHidden = false
+            axRow.set(detail: "Turn on LocalFlow in the list that opens", done: nil, button: "Open Settings")
         }
-        // Login item
+        // Switched on in System Settings: come back to the front to show the result.
+        if trusted, !wasTrusted, window?.isVisible == true {
+            NSApp.activate(ignoringOtherApps: true)
+            window?.makeKeyAndOrderFront(nil)
+        }
+        wasTrusted = trusted
+
         loginBox.state = SMAppService.mainApp.status == .enabled ? .on : .off
-        let allDone = modelReady() && AVCaptureDevice.authorizationStatus(for: .audio) == .authorized && AXIsProcessTrusted()
-        footer.stringValue = allDone ? "All set. Hold fn and speak, release to type." : "Finish the steps above."
-        footer.textColor = allDone ? .systemGreen : .secondaryLabelColor
+
+        let allDone = modelReady() && !enginePreparing()
+            && AVCaptureDevice.authorizationStatus(for: .audio) == .authorized && trusted
+        footer.setViews(allDone ? readyFooter() : [secondary("Finish the steps above to start dictating.")], in: .leading)
+    }
+
+    private func readyFooter() -> [NSView] {
+        let check = NSImageView(image: NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: nil)!)
+        check.symbolConfiguration = .init(pointSize: 15, weight: .semibold)
+        check.contentTintColor = .systemGreen
+        let hold = NSTextField(labelWithString: "All set. Hold")
+        let rest = NSTextField(labelWithString: "and speak, then let go.")
+        for l in [hold, rest] { l.font = .systemFont(ofSize: 13, weight: .medium) }
+        return [check, hold, Keycap(hotkeyName()), rest]
+    }
+
+    private func secondary(_ text: String) -> NSTextField {
+        let l = NSTextField(labelWithString: text)
+        l.textColor = .secondaryLabelColor
+        return l
     }
 
     @objc private func downloadTapped() { onDownloadRequested?(); refresh() }
@@ -188,4 +206,153 @@ final class SetupWindowController: NSWindowController {
         timer = nil
         window?.close()
     }
+}
+
+/// One setup step: a tinted symbol, a title with a line of detail, and either a checkmark or a button.
+private final class StepRow: NSView {
+    let button = NSButton(title: "", target: nil, action: nil)
+    private let detail = NSTextField(labelWithString: "")
+    private let doneLabel = NSTextField(labelWithString: "")
+    private let doneIcon = NSImageView(image: NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: nil)!)
+    private let texts: NSStackView
+
+    init(symbol: String, tint: NSColor, title: String) {
+        let badge = NSView()
+        badge.wantsLayer = true
+        badge.layer?.cornerRadius = 7
+        badge.layer?.backgroundColor = tint.cgColor
+        let glyph = NSImageView(image: NSImage(systemSymbolName: symbol, accessibilityDescription: nil)!)
+        glyph.symbolConfiguration = .init(pointSize: 14, weight: .semibold)
+        glyph.contentTintColor = .white
+        glyph.translatesAutoresizingMaskIntoConstraints = false
+        badge.addSubview(glyph)
+
+        let name = NSTextField(labelWithString: title)
+        name.font = .systemFont(ofSize: 13, weight: .semibold)
+        detail.font = .systemFont(ofSize: 11.5)
+        detail.textColor = .secondaryLabelColor
+        detail.lineBreakMode = .byTruncatingTail
+        texts = NSStackView(views: [name, detail])
+        texts.orientation = .vertical
+        texts.alignment = .leading
+        texts.spacing = 2
+
+        doneIcon.symbolConfiguration = .init(pointSize: 15, weight: .semibold)
+        doneIcon.contentTintColor = .systemGreen
+        doneLabel.font = .systemFont(ofSize: 12.5, weight: .medium)
+        doneLabel.textColor = .secondaryLabelColor
+        button.bezelStyle = .rounded
+
+        let row = NSStackView(views: [badge, texts, NSView(), doneLabel, doneIcon, button])
+        row.orientation = .horizontal
+        row.alignment = .centerY
+        row.spacing = 12
+        row.setCustomSpacing(5, after: doneLabel)
+        row.edgeInsets = NSEdgeInsets(top: 0, left: 14, bottom: 0, right: 14)
+        row.translatesAutoresizingMaskIntoConstraints = false
+        super.init(frame: .zero)
+        addSubview(row)
+        NSLayoutConstraint.activate([
+            row.leadingAnchor.constraint(equalTo: leadingAnchor),
+            row.trailingAnchor.constraint(equalTo: trailingAnchor),
+            row.centerYAnchor.constraint(equalTo: centerYAnchor),
+            heightAnchor.constraint(equalToConstant: 62),
+            badge.widthAnchor.constraint(equalToConstant: 28),
+            badge.heightAnchor.constraint(equalToConstant: 28),
+            glyph.centerXAnchor.constraint(equalTo: badge.centerXAnchor),
+            glyph.centerYAnchor.constraint(equalTo: badge.centerYAnchor),
+            texts.widthAnchor.constraint(lessThanOrEqualToConstant: 290),
+        ])
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    /// A view shown under the detail line (the download progress bar).
+    func addAccessory(_ view: NSView) {
+        texts.addArrangedSubview(view)
+        view.widthAnchor.constraint(equalToConstant: 220).isActive = true
+    }
+
+    /// `done` shows a checkmark with that word; otherwise `button`, if given, shows that button.
+    func set(detail text: String, done: String?, button title: String? = nil) {
+        detail.stringValue = text
+        doneLabel.stringValue = done ?? ""
+        doneLabel.isHidden = done == nil
+        doneIcon.isHidden = done == nil
+        button.isHidden = done != nil || title == nil
+        if let title = title { button.title = title }
+    }
+}
+
+/// A rounded group of rows with hairlines between them, like a System Settings section.
+private final class Card: NSView {
+    init(rows: [NSView]) {
+        super.init(frame: .zero)
+        wantsLayer = true
+        layer?.cornerRadius = 12
+        layer?.borderWidth = 1
+        var views: [NSView] = []
+        for (i, row) in rows.enumerated() {
+            if i > 0 {
+                let line = NSBox()
+                line.boxType = .separator
+                views.append(line)
+                line.widthAnchor.constraint(equalToConstant: 420).isActive = true
+            }
+            views.append(row)
+        }
+        let stack = NSStackView(views: views)
+        stack.orientation = .vertical
+        stack.alignment = .trailing
+        stack.spacing = 0
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: trailingAnchor),
+            stack.topAnchor.constraint(equalTo: topAnchor),
+            stack.bottomAnchor.constraint(equalTo: bottomAnchor),
+        ])
+        for row in rows { row.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true }
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func updateLayer() {
+        let dark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        layer?.backgroundColor = NSColor(white: 1, alpha: dark ? 0.06 : 0.75).cgColor
+        layer?.borderColor = NSColor(white: dark ? 1 : 0, alpha: 0.08).cgColor
+    }
+
+    override var wantsUpdateLayer: Bool { true }
+}
+
+/// The dictation key drawn as a small keycap.
+private final class Keycap: NSView {
+    init(_ text: String) {
+        super.init(frame: .zero)
+        wantsLayer = true
+        layer?.cornerRadius = 5
+        layer?.borderWidth = 1
+        let label = NSTextField(labelWithString: text)
+        label.font = .systemFont(ofSize: 12, weight: .semibold)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(label)
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 7),
+            label.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -7),
+            label.topAnchor.constraint(equalTo: topAnchor, constant: 2),
+            label.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -2),
+        ])
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func updateLayer() {
+        let dark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        layer?.backgroundColor = NSColor(white: dark ? 1 : 0, alpha: dark ? 0.1 : 0.05).cgColor
+        layer?.borderColor = NSColor(white: dark ? 1 : 0, alpha: 0.25).cgColor
+    }
+
+    override var wantsUpdateLayer: Bool { true }
 }
