@@ -5,15 +5,18 @@ import ServiceManagement
 /// First-run window: speech model, microphone, accessibility, start at login. Reopened from the menu any time.
 /// Always dark, on a painted gradient background, whatever the system appearance.
 final class SetupWindowController: NSWindowController {
-    private let modelRow = StepRow(symbol: "waveform", colors: [Palette.violet, Palette.indigo], title: "Speech model")
+    private let modelRow = StepRow(symbol: "waveform", colors: [Palette.violet, Palette.indigo], title: "Voice recognition")
     private let micRow = StepRow(symbol: "mic.fill", colors: [Palette.amber, Palette.orange], title: "Microphone")
     private let axRow = StepRow(symbol: "accessibility", colors: [Palette.sky, Palette.blue], title: "Accessibility")
     private let progress = NSProgressIndicator()
     private let loginBox = NSButton(checkboxWithTitle: "Start LocalFlow when I log in", target: nil, action: nil)
     private let footer = NSStackView()
     private let doneButton = GradientButton(title: "Done", symbol: "checkmark")
+    private lazy var card = Card(rows: [modelRow, micRow, axRow])
     private var timer: Timer?
     private var wasTrusted = AXIsProcessTrusted()
+    /// The voice recognition row is a step only when it needs doing (a download); otherwise it isn't shown.
+    private var showModelRow = true
 
     var onDownloadRequested: (() -> Void)?
     var modelReady: () -> Bool = { false }
@@ -73,8 +76,6 @@ final class SetupWindowController: NSWindowController {
         doneButton.target = self; doneButton.action = #selector(doneTapped)
         doneButton.keyEquivalent = "\r"
 
-        let card = Card(rows: [modelRow, micRow, axRow])
-
         footer.orientation = .horizontal
         footer.alignment = .centerY
         footer.spacing = 7
@@ -105,28 +106,40 @@ final class SetupWindowController: NSWindowController {
     }
 
     func show() {
+        showModelRow = !modelReady()
         refresh()
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.refresh() }
-        if let window = window, let content = window.contentView {
-            content.layoutSubtreeIfNeeded()
-            window.setContentSize(content.fittingSize)
-            window.center()
-        }
+        fitWindow()
+        window?.center()
         NSApp.activate(ignoringOtherApps: true)
         showWindow(nil)
         window?.makeKeyAndOrderFront(nil)
     }
 
+    /// Sizes the window to its content, keeping its top edge where it is.
+    private func fitWindow() {
+        guard let window = window, let content = window.contentView else { return }
+        content.layoutSubtreeIfNeeded()
+        var frame = window.frameRect(forContentRect: NSRect(origin: .zero, size: content.fittingSize))
+        frame.origin = NSPoint(x: window.frame.minX, y: window.frame.maxY - frame.height)
+        window.setFrame(frame, display: true, animate: window.isVisible)
+    }
+
     func refresh() {
-        // Speech model
+        // Voice recognition: shown only while it has to be downloaded, then until the window closes.
+        if modelRow.isHidden == showModelRow {
+            modelRow.isHidden = !showModelRow
+            card.lines.first?.isHidden = !showModelRow
+            fitWindow()
+        }
         progress.isHidden = true
         if modelReady() && enginePreparing() {
             modelRow.set(detail: "Getting ready… (the first time takes about 30 s)", done: nil)
         } else if modelReady() {
-            modelRow.set(detail: "Runs on this Mac, no internet needed", done: "Ready")
+            modelRow.set(detail: "Ready to use, works offline", done: "Ready")
         } else if let f = downloadFraction() {
-            modelRow.set(detail: "Downloading… \(Int(f * 100))%", done: nil)
+            modelRow.set(detail: "Downloading once… \(Int(f * 100))%", done: nil)
             progress.isHidden = false
             progress.doubleValue = f
         } else {
@@ -505,6 +518,9 @@ private final class GradientButton: NSButton {
 
 /// A rounded, translucent group of rows with hairlines between them.
 private final class Card: NSView {
+    /// The hairlines; `lines[i]` sits above `rows[i + 1]`.
+    private(set) var lines: [NSView] = []
+
     init(rows: [NSView]) {
         super.init(frame: .zero)
         wantsLayer = true
@@ -520,6 +536,7 @@ private final class Card: NSView {
                 line.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.10).cgColor
                 line.heightAnchor.constraint(equalToConstant: 1).isActive = true
                 line.widthAnchor.constraint(equalToConstant: 480).isActive = true
+                lines.append(line)
                 views.append(line)
             }
             views.append(row)
